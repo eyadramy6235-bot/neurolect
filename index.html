@@ -252,7 +252,25 @@
 
 <!-- Settings -->
 <div id="view-settings" class="hidden flex-1 p-6 lg:p-10 bg-dark-900 overflow-y-auto custom-scrollbar pb-24 lg:pb-10">
-    <div class="max-w-3xl mx-auto"><h2 class="text-3xl font-black mb-8 text-white">محرك الذكاء الاصطناعي</h2>
+    <div class="max-w-3xl mx-auto">
+    
+    <h2 class="text-3xl font-black mb-8 text-white">إعدادات الحساب</h2>
+    <div class="bg-dark-800 rounded-2xl shadow-xl p-8 border border-dark-700 mb-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-full bg-accent-500/20 text-accent-500 flex items-center justify-center text-3xl shrink-0">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-white mb-1" id="settingsAccountName">مستخدم</h3>
+                <p class="text-sm text-slate-400" id="settingsAccountId">...</p>
+            </div>
+        </div>
+        <button onclick="handleLogout()" class="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white w-full md:w-auto px-6 py-3 rounded-xl font-bold transition flex justify-center items-center gap-2">
+            <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+        </button>
+    </div>
+
+    <h2 class="text-3xl font-black mb-8 text-white">محرك الذكاء الاصطناعي</h2>
     <div class="bg-red-500/10 border border-red-500/50 rounded-xl p-4 mb-6 hidden" id="quotaAlert"><h4 class="text-red-400 font-bold mb-1"><i class="fas fa-exclamation-triangle"></i> Quota Exceeded</h4><p class="text-sm text-red-300">اختر موديل flash.</p></div>
     <div class="bg-dark-800 rounded-2xl shadow-xl p-8 border border-dark-700">
         <div class="mb-6"><label class="block text-sm font-bold text-slate-400 mb-2">Gemini API Key</label><div class="flex gap-2"><input type="password" id="apiKeyInput" class="flex-1 p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500 font-mono" placeholder="AIzaSy..."><button onclick="fetchModelsList()" class="bg-dark-700 hover:bg-dark-600 border border-dark-600 text-white px-4 rounded-xl font-bold transition whitespace-nowrap"><i class="fas fa-sync-alt mr-1"></i> تحميل</button></div></div>
@@ -342,15 +360,26 @@ async function handleGoogleLogin(){
         
         // Save user and enter app
         localStorage.setItem('neurolect_lastuser', user.uid);
+        localStorage.setItem('neurolect_username', user.displayName || user.email || 'مستخدم');
         currentUser = user.uid;
-        document.getElementById('sidebarUsername').innerText = user.displayName || user.email;
         alert('تم تسجيل الدخول بنجاح يا ' + (user.displayName || ''));
         enterApp();
     } catch (e) {
         alert('خطأ في تسجيل الدخول: ' + e.message);
     }
 }
-async function enterApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('sidebarUsername').innerText=currentUser;const db=getUserDB();const d=await db.getItem('lectures');if(d)lectures=d;const f=await db.getItem('folders');if(f)folders=f;document.getElementById('apiKeyInput').value=localStorage.getItem('gemini_api_key_'+currentUser)||'';const sm=localStorage.getItem('gemini_model_'+currentUser);if(sm)document.getElementById('modelSelect').innerHTML=`<option value="${sm}">${sm}</option>`;initSpeechRecognition();currentFolderId=null;switchTab('library');}
+async function enterApp(){
+    document.getElementById('loginScreen').classList.add('hidden');
+    const uName = localStorage.getItem('neurolect_username') || currentUser;
+    document.getElementById('sidebarUsername').innerText = uName;
+    document.getElementById('settingsAccountName').innerText = uName;
+    document.getElementById('settingsAccountId').innerText = "الحساب: " + currentUser;
+    
+    const db=getUserDB();const d=await db.getItem('lectures');if(d)lectures=d;const f=await db.getItem('folders');if(f)folders=f;
+    document.getElementById('apiKeyInput').value=localStorage.getItem('gemini_api_key_'+currentUser)||'';
+    const sm=localStorage.getItem('gemini_model_'+currentUser);if(sm)document.getElementById('modelSelect').innerHTML=`<option value="${sm}">${sm}</option>`;
+    initSpeechRecognition();currentFolderId=null;switchTab('library');
+}
 (function(){const u=localStorage.getItem('neurolect_lastuser');if(u){currentUser=u;enterApp();}})();
 
 // ===== BACKUP =====
