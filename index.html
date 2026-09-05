@@ -226,12 +226,10 @@
 <div id="view-library" class="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar pb-24 lg:pb-10">
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
                 <h2 class="text-3xl font-black text-white">مساحة العمل</h2>
-                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-dark-800 border border-dark-700/60 shadow-sm cursor-pointer" onclick="manualSync()" title="المزامنة السحابية اللحظية نشطة">
-                    <span id="syncStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                    <span id="syncStatusText" class="text-[10px] font-bold text-slate-400">سحابي</span>
-                </div>
+                <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] mt-1" title="متصل"></span>
+                <span id="syncStatusText" class="hidden"></span>
             </div>
             <p class="text-slate-400 mt-1 text-sm">استعرض وحلل محاضراتك</p>
         </div>
@@ -1600,12 +1598,14 @@ async function saveToLocal(){
         await db.setItem('lectures',lectures);
         await db.setItem('folders',folders);
     }catch(e){console.error(e);}
-    syncToCloud();
 }
 
 // ===== REALTIME CLOUD SYNC =====
 let _cloudUnsubscribe = null;
+let _folderUnsubscribe = null;
 let _syncDebounce = null;
+let _suppressCloudListener = false;  // prevents re-entrant sync loops
+let _initialSyncDone = false;
 
 function getFirestoreDB() {
     if (!firebaseApp) {
@@ -1614,42 +1614,36 @@ function getFirestoreDB() {
     return window.getFirestore(firebaseApp);
 }
 
-function setSyncStatus(status, text) {
+function setSyncStatus(status) {
     const dot = document.getElementById('syncStatusDot');
-    const label = document.getElementById('syncStatusText');
     if (!dot) return;
     
     if (status === 'syncing') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.8)]';
-        if (label) label.innerText = 'مزامنة...';
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_6px_rgba(251,191,36,0.7)] mt-1';
+        dot.title = 'جاري المزامنة';
     } else if (status === 'synced') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]';
-        if (label) label.innerText = 'سحابي';
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] mt-1';
+        dot.title = 'متصل';
     } else if (status === 'error') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]';
-        if (label) label.innerText = 'تنبيه';
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)] mt-1';
+        dot.title = 'خطأ في الاتصال';
     } else {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
-        if (label) label.innerText = 'محلي';
+        dot.className = 'w-2 h-2 rounded-full bg-slate-500 mt-1';
+        dot.title = 'غير متصل';
     }
 }
 
 function handleCloudSyncError(err) {
     console.warn('Cloud Sync Notice:', err);
-    let msg = 'خطأ مزامنة';
     if (err && (err.code === 'permission-denied' || (err.message && err.message.includes('permission')))) {
-        msg = 'تأكد من وضع Test Mode في Firestore';
-        toast('⚠️ تنبيه: يرجى تفعيل Firestore Database في وضع Test Mode في Firebase Console للسماح بالحفظ والمزامنة.', 'error');
-    } else if (err && err.code === 'unavailable') {
-        msg = 'أنت غير متصل';
-    } else {
-        msg = 'خطأ سحابي';
+        toast('⚠️ يرجى تفعيل Firestore في وضع Test Mode.', 'error');
     }
-    setSyncStatus('error', msg);
+    setSyncStatus('error');
 }
 
 async function uploadSingleLectureToCloud(l) {
     if (!currentUser || !window.getFirestore) return;
+    _suppressCloudListener = true;
     try {
         const db = getFirestoreDB();
         const docRef = window.doc(db, 'users', currentUser, 'lectures', String(l.id));
@@ -1657,6 +1651,9 @@ async function uploadSingleLectureToCloud(l) {
             ? l.date 
             : (l.id ? new Date(Number(l.id)).toISOString() : new Date().toISOString());
         const safeTitle = (l.title && l.title.trim()) ? l.title : ('محاضرة ' + formatLectureDate({ date: safeDate, id: l.id }));
+        
+        const ts = Date.now();
+        l._localUpdatedAt = ts;
         
         await window.setDoc(docRef, {
             id: Number(l.id) || Date.now(),
@@ -1670,25 +1667,30 @@ async function uploadSingleLectureToCloud(l) {
             chatHistory: Array.isArray(l.chatHistory) ? l.chatHistory.slice(-30) : [],
             folderId: l.folderId || null,
             hasAudio: !!(l.audioData && l.audioData.length > 50),
-            updatedAt: Date.now()
+            updatedAt: ts
         }, { merge: true });
+        setSyncStatus('synced');
     } catch(e) {
         handleCloudSyncError(e);
     }
+    setTimeout(() => { _suppressCloudListener = false; }, 1500);
 }
 
 async function deleteLectureFromCloud(id) {
     if (!currentUser || !window.getFirestore) return;
+    _suppressCloudListener = true;
     try {
         const db = getFirestoreDB();
         await window.deleteDoc(window.doc(db, 'users', currentUser, 'lectures', String(id)));
     } catch(e) {
         console.warn('Delete cloud doc failed:', e);
     }
+    setTimeout(() => { _suppressCloudListener = false; }, 1500);
 }
 
 async function syncFoldersToCloud() {
     if (!currentUser || !window.getFirestore) return;
+    _suppressCloudListener = true;
     try {
         const db = getFirestoreDB();
         await window.setDoc(window.doc(db, 'users', currentUser, 'meta', 'workspace'), {
@@ -1698,6 +1700,7 @@ async function syncFoldersToCloud() {
     } catch(e) {
         console.warn('Sync folders failed:', e);
     }
+    setTimeout(() => { _suppressCloudListener = false; }, 1500);
 }
 
 async function syncToCloud() {
@@ -1723,25 +1726,31 @@ function initRealtimeCloudSync() {
         return;
     }
     
+    // Unsubscribe old listeners
+    if (_cloudUnsubscribe) { _cloudUnsubscribe(); _cloudUnsubscribe = null; }
+    if (_folderUnsubscribe) { _folderUnsubscribe(); _folderUnsubscribe = null; }
+    
     try {
         const db = getFirestoreDB();
         setSyncStatus('syncing');
+        _initialSyncDone = false;
         
         // 1. Realtime Folders Listener
-        window.onSnapshot(window.doc(db, 'users', currentUser, 'meta', 'workspace'), (snap) => {
+        _folderUnsubscribe = window.onSnapshot(window.doc(db, 'users', currentUser, 'meta', 'workspace'), (snap) => {
+            if (_suppressCloudListener) return;
             if (snap.exists()) {
                 const data = snap.data();
                 if (data && Array.isArray(data.folders)) {
-                    const cloudFolderIds = new Set(data.folders.map(f => String(f.id)));
-                    const merged = [...data.folders];
+                    // Merge: cloud is source of truth, but keep local-only folders
+                    const cloudMap = new Map(data.folders.map(f => [String(f.id), f]));
                     let localHasNew = false;
                     folders.forEach(lf => {
-                        if (!cloudFolderIds.has(String(lf.id))) {
-                            merged.push(lf);
+                        if (!cloudMap.has(String(lf.id))) {
+                            cloudMap.set(String(lf.id), lf);
                             localHasNew = true;
                         }
                     });
-                    folders = merged;
+                    folders = Array.from(cloudMap.values());
                     getUserDB().setItem('folders', folders);
                     renderLibrary();
                     if (localHasNew) syncFoldersToCloud();
@@ -1752,10 +1761,9 @@ function initRealtimeCloudSync() {
         }, (err) => handleCloudSyncError(err));
         
         // 2. Realtime Lectures Listener
-        if (_cloudUnsubscribe) { _cloudUnsubscribe(); _cloudUnsubscribe = null; }
-        
         _cloudUnsubscribe = window.onSnapshot(window.collection(db, 'users', currentUser, 'lectures'), async (snapshot) => {
-            setSyncStatus('syncing');
+            if (_suppressCloudListener) return;
+            
             const cloudMap = new Map();
             snapshot.forEach(docSnap => {
                 const cl = docSnap.data();
@@ -1764,7 +1772,7 @@ function initRealtimeCloudSync() {
             
             let changed = false;
             
-            // Merge Cloud -> Local
+            // Merge Cloud -> Local (cloud updates win unless local is newer)
             for (const [idStr, cl] of cloudMap.entries()) {
                 const local = lectures.find(l => String(l.id) === idStr);
                 const safeDate = (cl.date && cl.date !== '' && !String(cl.date).includes('Invalid')) 
@@ -1773,6 +1781,7 @@ function initRealtimeCloudSync() {
                 const safeTitle = (cl.title && cl.title.trim()) ? cl.title : ('محاضرة ' + formatLectureDate({ date: safeDate, id: cl.id }));
                 
                 if (!local) {
+                    // New lecture from another device - add it
                     lectures.push({
                         id: Number(cl.id) || Date.now(),
                         title: safeTitle,
@@ -1785,10 +1794,16 @@ function initRealtimeCloudSync() {
                         chatHistory: Array.isArray(cl.chatHistory) ? cl.chatHistory : [],
                         folderId: cl.folderId || null,
                         audioData: '',
-                        images: []
+                        images: [],
+                        _localUpdatedAt: cl.updatedAt || 0
                     });
                     changed = true;
                 } else {
+                    // Existing lecture - only update if cloud is newer
+                    const cloudTs = cl.updatedAt || 0;
+                    const localTs = local._localUpdatedAt || 0;
+                    if (cloudTs <= localTs) continue; // local is same or newer, skip
+                    
                     if (cl.title && local.title !== cl.title) { local.title = cl.title; changed = true; }
                     if (safeDate && (!local.date || String(local.date).includes('Invalid'))) { local.date = safeDate; changed = true; }
                     if (cl.transcript && local.transcript !== cl.transcript) { local.transcript = cl.transcript; changed = true; }
@@ -1800,8 +1815,9 @@ function initRealtimeCloudSync() {
                         local.chatHistory = cl.chatHistory;
                         changed = true;
                     }
+                    if (changed) local._localUpdatedAt = cloudTs;
                     
-                    // LIVE DOM UPDATE: If this lecture is currently open on screen, update elements immediately!
+                    // LIVE DOM UPDATE: If this lecture is currently open on screen
                     if (currentLectureId && String(currentLectureId) === idStr) {
                         if (cl.title) document.getElementById('detailTitle').innerText = cl.title;
                         if (cl.notes !== undefined) {
@@ -1824,10 +1840,13 @@ function initRealtimeCloudSync() {
                 }
             }
             
-            // Check if any local lecture is missing from cloud
-            for (const l of lectures) {
-                if (!cloudMap.has(String(l.id))) {
-                    uploadSingleLectureToCloud(l);
+            // On first sync only: upload local lectures that are missing from cloud
+            if (!_initialSyncDone) {
+                _initialSyncDone = true;
+                for (const l of lectures) {
+                    if (!cloudMap.has(String(l.id))) {
+                        uploadSingleLectureToCloud(l);
+                    }
                 }
             }
             
@@ -1847,18 +1866,15 @@ function initRealtimeCloudSync() {
 }
 
 async function manualSync() {
-    setSyncStatus('syncing', 'جاري المزامنة...');
-    toast('🔄 جاري المزامنة الفورية مع السحابة...', 'info');
+    setSyncStatus('syncing');
     try {
         await waitForFirebase(4000);
         if (!firebaseApp) firebaseApp = window.initializeApp(FIREBASE_CONFIG);
+        _initialSyncDone = false; // allow re-upload of locals
         await syncToCloud();
-        initRealtimeCloudSync();
-        toast('✅ تم تحديث المزامنة السحابية بنجاح!', 'ok');
-        setSyncStatus('synced', 'متزامن مع السحابة');
+        setSyncStatus('synced');
     } catch(e) {
         handleCloudSyncError(e);
-        alert('تفاصيل خطأ المزامنة:\n' + e.message + '\n\nيرجى التأكد من إنشاء Firestore Database في وضع Test Mode داخل Firebase Console.');
     }
 }
 
