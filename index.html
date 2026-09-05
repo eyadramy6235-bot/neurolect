@@ -225,13 +225,17 @@
 <!-- Library -->
 <div id="view-library" class="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar pb-24 lg:pb-10">
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div><h2 class="text-3xl font-black text-white">مساحة العمل</h2><p class="text-slate-400 mt-1 text-sm">استعرض وحلل محاضراتك</p></div>
+        <div>
+            <div class="flex items-center gap-3">
+                <h2 class="text-3xl font-black text-white">مساحة العمل</h2>
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-dark-800 border border-dark-700/60 shadow-sm cursor-pointer" onclick="manualSync()" title="المزامنة السحابية اللحظية نشطة">
+                    <span id="syncStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                    <span id="syncStatusText" class="text-[10px] font-bold text-slate-400">سحابي</span>
+                </div>
+            </div>
+            <p class="text-slate-400 mt-1 text-sm">استعرض وحلل محاضراتك</p>
+        </div>
         <div class="flex flex-wrap gap-2 items-center w-full md:w-auto">
-            <button id="cloudSyncBtn" onclick="manualSync()" title="اضغط للمزامنة الفورية مع السحابة" class="bg-dark-800 hover:bg-dark-700 text-xs px-3.5 py-2.5 rounded-xl border border-dark-700 font-bold transition flex items-center gap-2">
-                <span id="syncStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                <span id="syncStatusText" class="text-slate-300">مزامنة سحابية</span>
-                <i class="fas fa-sync-alt text-slate-400 text-xs" id="syncStatusIcon"></i>
-            </button>
             <div class="relative flex-1 md:w-64">
                 <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
                 <input id="librarySearch" type="search" oninput="renderLibrary()" class="w-full p-2.5 pr-9 bg-dark-800 rounded-xl border border-dark-700 text-white text-sm focus:outline-none focus:border-accent-500" placeholder="ابحث في المحاضرات...">
@@ -322,7 +326,7 @@
     </div>
 </div>
         <div id="dtab-transcript" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><div class="flex justify-between items-center mb-4 gap-2 flex-wrap"><h3 class="text-lg font-bold text-white"><i class="fas fa-language text-blue-400 ml-2"></i> التفريغ</h3><div class="flex gap-2"><button onclick="copyTranscript()" class="text-xs bg-dark-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg font-bold transition border border-dark-600"><i class="fas fa-copy"></i> نسخ</button><button onclick="generatePerfectTranscript()" class="text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded-lg font-bold transition"><i class="fas fa-bolt"></i> تفريغ بـ Gemini</button></div></div><div class="bg-dark-900 rounded-xl p-4 border border-dark-700 overflow-y-auto max-h-96 custom-scrollbar text-sm text-slate-300 font-mono leading-relaxed whitespace-pre-wrap" id="detailTranscript"></div><div id="transcriptStatus" class="text-xs text-red-400 mt-2 font-bold hidden"></div></div></div>
-        <div id="dtab-notes" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-book-journal-whills text-orange-400 ml-2"></i> ملاحظات وصور</h3><textarea id="detailNotes" rows="8" class="w-full p-4 bg-dark-900 border border-dark-700 rounded-xl focus:outline-none focus:border-orange-500/50 text-slate-300 resize-none font-mono text-sm leading-loose custom-scrollbar mb-4" placeholder="ملاحظاتك..."></textarea><div class="mb-3"><label class="cursor-pointer bg-dark-700 hover:bg-dark-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border border-dark-600 w-fit"><i class="fas fa-camera"></i> أضف صورة<input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)"></label></div><div id="imagesGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2"></div><button onclick="saveLectureData()" class="mt-6 w-full bg-dark-700 hover:bg-dark-600 text-white py-4 rounded-xl font-bold border border-dark-600 transition"><i class="fas fa-save"></i> حفظ</button></div></div>
+        <div id="dtab-notes" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-book-journal-whills text-orange-400 ml-2"></i> ملاحظات وصور</h3><textarea id="detailNotes" oninput="debounceSaveNotes()" rows="8" class="w-full p-4 bg-dark-900 border border-dark-700 rounded-xl focus:outline-none focus:border-orange-500/50 text-slate-300 resize-none font-mono text-sm leading-loose custom-scrollbar mb-4" placeholder="ملاحظاتك..."></textarea><div class="mb-3"><label class="cursor-pointer bg-dark-700 hover:bg-dark-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border border-dark-600 w-fit"><i class="fas fa-camera"></i> أضف صورة<input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)"></label></div><div id="imagesGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2"></div><button onclick="saveLectureData()" class="mt-6 w-full bg-dark-700 hover:bg-dark-600 text-white py-4 rounded-xl font-bold border border-dark-600 transition"><i class="fas fa-save"></i> حفظ</button></div></div>
         <div id="dtab-quiz" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><div class="flex justify-between items-center mb-4 gap-2 flex-wrap"><h3 class="text-xl font-black text-white"><i class="fas fa-clipboard-question text-pink-400 ml-2"></i> أسئلة مراجعة</h3><button onclick="generateQuiz()" class="text-sm bg-pink-600 text-white hover:bg-pink-500 px-4 py-2 rounded-xl font-bold transition"><i class="fas fa-magic"></i> توليد الأسئلة</button></div><div id="quizStatus" class="text-xs text-red-400 mb-3 font-bold hidden"></div><div id="quizList" class="space-y-3"></div></div></div>
     </div>
 </div>
@@ -574,16 +578,76 @@ function importBackup(){document.getElementById('importFileInput').click();}
 async function processImport(ev){const f=ev.target.files[0];if(!f)return;try{const raw=JSON.parse(await f.text());if(Array.isArray(raw)){lectures=raw;folders=[];}else{lectures=raw.lectures||[];folders=raw.folders||[];}await saveToLocal();currentFolderId=null;renderLibrary();toast('تم الاستيراد!','ok');}catch(e){toast('ملف غير صالح.','error');}}
 
 // ===== FOLDERS =====
-function getFolderPath(folderId){const path=[];let id=folderId;while(id){const f=folders.find(x=>x.id===id);if(!f)break;path.unshift(f);id=f.parentId;}return path;}
-function getSubFolders(parentId){return folders.filter(f=>f.parentId===parentId);}
-function getLecturesInFolder(folderId){return lectures.filter(l=>(l.folderId||null)===(folderId||null));}
-function createFolder(){const name=prompt('اسم المجلد الجديد:');if(!name||!name.trim())return;folders.push({id:Date.now(),name:name.trim(),parentId:currentFolderId});saveToLocal();renderLibrary();}
-function renameFolder(id){const f=folders.find(x=>x.id===id);const n=prompt('تعديل اسم المجلد:',f.name);if(n&&n.trim()){f.name=n.trim();saveToLocal();renderLibrary();}}
-function deleteFolder(id){const subFolders=getSubFolders(id);const subLectures=getLecturesInFolder(id);if(subFolders.length||subLectures.length){if(!confirm('سيتم نقل محتوى المجلد للأب. متأكد؟'))return;const folder=folders.find(x=>x.id===id);const parentId=folder?folder.parentId:null;subFolders.forEach(sf=>sf.parentId=parentId);subLectures.forEach(sl=>sl.folderId=parentId);}folders=folders.filter(f=>f.id!==id);saveToLocal();renderLibrary();}
+function getFolderPath(folderId){
+    const path=[];let id=folderId;
+    while(id){
+        const f=folders.find(x=>String(x.id)===String(id));
+        if(!f)break;
+        path.unshift(f);
+        id=f.parentId;
+    }
+    return path;
+}
+function getSubFolders(parentId){
+    const pTarget = (parentId !== undefined && parentId !== null && parentId !== '') ? String(parentId) : null;
+    return folders.filter(f => {
+        const pCurrent = (f.parentId !== undefined && f.parentId !== null && f.parentId !== '') ? String(f.parentId) : null;
+        return pCurrent === pTarget;
+    });
+}
+function getLecturesInFolder(folderId){
+    const fTarget = (folderId !== undefined && folderId !== null && folderId !== '') ? String(folderId) : null;
+    return lectures.filter(l => {
+        const fCurrent = (l.folderId !== undefined && l.folderId !== null && l.folderId !== '') ? String(l.folderId) : null;
+        return fCurrent === fTarget;
+    });
+}
+function createFolder(){
+    const name=prompt('اسم المجلد الجديد:');
+    if(!name||!name.trim())return;
+    folders.push({id:Date.now(),name:name.trim(),parentId:currentFolderId});
+    saveToLocal();
+    syncFoldersToCloud();
+    renderLibrary();
+}
+function renameFolder(id){
+    const f=folders.find(x=>x.id===id);
+    const n=prompt('تعديل اسم المجلد:',f.name);
+    if(n&&n.trim()){
+        f.name=n.trim();
+        saveToLocal();
+        syncFoldersToCloud();
+        renderLibrary();
+    }
+}
+function deleteFolder(id){
+    const subFolders=getSubFolders(id);
+    const subLectures=getLecturesInFolder(id);
+    if(subFolders.length||subLectures.length){
+        if(!confirm('سيتم نقل محتوى المجلد للأب. متأكد؟'))return;
+        const folder=folders.find(x=>x.id===id);
+        const parentId=folder?folder.parentId:null;
+        subFolders.forEach(sf=>sf.parentId=parentId);
+        subLectures.forEach(sl=>{ sl.folderId=parentId; uploadSingleLectureToCloud(sl); });
+    }
+    folders=folders.filter(f=>f.id!==id);
+    saveToLocal();
+    syncFoldersToCloud();
+    renderLibrary();
+}
 function openMoveModal(lectureId){movingLectureId=lectureId;document.getElementById('moveModal').classList.remove('modal-hidden');renderMoveList();}
 function closeMoveModal(){document.getElementById('moveModal').classList.add('modal-hidden');movingLectureId=null;}
 function renderMoveList(){const list=document.getElementById('moveFoldersList');list.innerHTML='';const lecture=lectures.find(l=>l.id===movingLectureId);const currentFolder=lecture?lecture.folderId||null:null;const rootBtn=document.createElement('button');rootBtn.className=`w-full flex items-center gap-3 p-4 rounded-xl border text-right transition ${currentFolder===null?'border-accent-500 bg-accent-500/10 text-accent-400':'border-dark-700 bg-dark-900 text-slate-300 hover:bg-dark-700 hover:text-white'}`;rootBtn.innerHTML='<i class="fas fa-home text-lg"></i><span class="font-bold">الرئيسية</span>';rootBtn.onclick=()=>moveLectureTo(null);list.appendChild(rootBtn);folders.forEach(f=>{const path=getFolderPath(f.id).map(x=>x.name).join(' / ');const btn=document.createElement('button');btn.className=`w-full flex items-center gap-3 p-4 rounded-xl border text-right transition ${currentFolder===f.id?'border-accent-500 bg-accent-500/10 text-accent-400':'border-dark-700 bg-dark-900 text-slate-300 hover:bg-dark-700 hover:text-white'}`;btn.innerHTML=`<i class="fas fa-folder text-amber-400 text-lg"></i><div><span class="font-bold block">${f.name}</span><span class="text-xs text-slate-500">${path}</span></div>`;btn.onclick=()=>moveLectureTo(f.id);list.appendChild(btn);});}
-function moveLectureTo(folderId){const l=lectures.find(x=>x.id===movingLectureId);if(l){l.folderId=folderId;saveToLocal();renderLibrary();}closeMoveModal();}
+function moveLectureTo(folderId){
+    const l=lectures.find(x=>x.id===movingLectureId);
+    if(l){
+        l.folderId=folderId;
+        saveToLocal();
+        uploadSingleLectureToCloud(l);
+        renderLibrary();
+    }
+    closeMoveModal();
+}
 
 // ===== TABS =====
 function switchTab(tab){
@@ -599,6 +663,24 @@ function switchTab(tab){
 function switchDetailTab(dt){document.querySelectorAll('.detail-tab-content').forEach(el=>el.classList.add('hidden'));document.getElementById('dtab-'+dt).classList.remove('hidden');document.querySelectorAll('.detail-tab-btn').forEach(b=>b.className='detail-tab-btn bg-dark-800 text-slate-400 hover:text-white px-5 py-2 rounded-xl font-bold text-sm transition border border-dark-700');const ab=document.querySelector(`.detail-tab-btn[data-dtab="${dt}"]`);if(ab)ab.className='detail-tab-btn bg-accent-600 text-white px-5 py-2 rounded-xl font-bold text-sm transition';}
 
 // ===== LIBRARY =====
+function formatLectureDate(l) {
+    if (!l) return 'اليوم';
+    let d = l.date;
+    if (!d || d === '' || d === 'Invalid Date' || String(d).includes('Invalid')) {
+        d = l.id ? Number(l.id) : Date.now();
+    }
+    try {
+        let dt = new Date(d);
+        if (isNaN(dt.getTime())) {
+            dt = new Date(Number(l.id) || Date.now());
+        }
+        if (isNaN(dt.getTime())) return 'اليوم';
+        return dt.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch(e) {
+        return 'اليوم';
+    }
+}
+
 function renderLibrary(){
     const grid=document.getElementById('lecturesGrid');grid.innerHTML='';
     const bc=document.getElementById('breadcrumb');bc.innerHTML='';
@@ -617,7 +699,12 @@ function renderLibrary(){
             if(!hay.includes(q)) return;
         }
         const dur=l.duration?formatDuration(l.duration):'';
-        const card=document.createElement('div');card.className="bg-dark-800 p-6 rounded-2xl border border-dark-700 hover:border-accent-500/50 cursor-pointer flex flex-col transition";card.onclick=()=>openLectureDetails(l.id);card.innerHTML=`<div class="flex justify-between mb-4"><div class="text-accent-400 bg-dark-900 w-10 h-10 rounded-lg flex items-center justify-center border border-dark-700"><i class="fas fa-file-audio"></i></div><div class="flex gap-1"><button onclick="event.stopPropagation();openMoveModal(${l.id})" class="text-slate-600 hover:text-amber-400 transition p-2" title="نقل"><i class="fas fa-folder-open text-xs"></i></button><button onclick="event.stopPropagation();deleteLecture(${l.id})" class="text-slate-600 hover:text-red-500 transition p-2" title="حذف"><i class="fas fa-trash text-xs"></i></button></div></div><h3 class="font-bold text-lg text-white mb-1 truncate">${l.title}</h3><p class="text-xs text-slate-500 font-mono">${new Date(l.date).toLocaleDateString('ar-EG')}${dur?' · '+dur:''}${l.hasAudio===false&&!l.audioData?' · بدون صوت':''}</p>`;grid.appendChild(card);
+        const displayDate = formatLectureDate(l);
+        const displayTitle = (l.title && l.title.trim()) ? l.title : ('محاضرة ' + displayDate);
+        const card=document.createElement('div');card.className="bg-dark-800 p-6 rounded-2xl border border-dark-700 hover:border-accent-500/50 cursor-pointer flex flex-col transition";
+        card.onclick=()=>openLectureDetails(l.id);
+        card.innerHTML=`<div class="flex justify-between mb-4"><div class="text-accent-400 bg-dark-900 w-10 h-10 rounded-lg flex items-center justify-center border border-dark-700"><i class="fas fa-file-audio"></i></div><div class="flex gap-1"><button onclick="event.stopPropagation();openMoveModal(${l.id})" class="text-slate-600 hover:text-amber-400 transition p-2" title="نقل"><i class="fas fa-folder-open text-xs"></i></button><button onclick="event.stopPropagation();deleteLecture(${l.id})" class="text-slate-600 hover:text-red-500 transition p-2" title="حذف"><i class="fas fa-trash text-xs"></i></button></div></div><h3 class="font-bold text-lg text-white mb-1 truncate">${displayTitle}</h3><p class="text-xs text-slate-500 font-mono">${displayDate}${dur?' · '+dur:''}${l.hasAudio===false&&!l.audioData?' · بدون صوت':''}</p>`;
+        grid.appendChild(card);
     });
     if(!grid.children.length){grid.innerHTML='<div class="col-span-full text-center py-20 text-slate-500"><i class="fas fa-folder-open text-4xl mb-3 block text-slate-600"></i>'+(document.getElementById('librarySearch')?.value?'لا توجد نتائج للبحث':'فارغ — سجّل محاضرة أو ارفع ملف صوت')+'</div>';}
 }
@@ -997,7 +1084,7 @@ ${l.notes?'\nملاحظات الطالب الخاصة:\n'+l.notes:''}`;
         }
         
         chatHistory.push({role:'user',text:finalUserQuestion},{role:'ai',text:finalAnswer});
-        l.chatHistory=chatHistory;await saveToLocal();
+        l.chatHistory=chatHistory;await saveToLocal();uploadSingleLectureToCloud(l);
         
         tDiv.remove();
         const aDiv=document.createElement('div');aDiv.className='gemini-bubble-ai';
@@ -1220,8 +1307,150 @@ function presKeyHandler(e) {
 }
 
 // ===== DETAILS =====
-function editTitle(){const l=lectures.find(x=>x.id===currentLectureId);const n=prompt('تعديل اسم المحاضرة:',l.title);if(n&&n.trim()){l.title=n.trim();document.getElementById('detailTitle').innerText=l.title;saveToLocal();}}
+function editTitle(){const l=lectures.find(x=>x.id===currentLectureId);const n=prompt('تعديل اسم المحاضرة:',l.title);if(n&&n.trim()){l.title=n.trim();document.getElementById('detailTitle').innerText=l.title;saveToLocal();uploadSingleLectureToCloud(l);renderLibrary();}}
 function renderSummaryContent(l){const el=document.getElementById('detailSummary');el.innerHTML=l.summary?marked.parse(l.summary):'<p class="text-slate-500 text-center mt-10">اضغط "بناء العرض" لإنشاء عرض تقديمي.</p>';}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function renderQuizContent(l) {
+    const el = document.getElementById('quizList');
+    if (!el) return;
+    if (!l || !l.quiz) {
+        el.innerHTML = '<div class="text-center py-12 text-slate-500"><i class="fas fa-clipboard-question text-4xl mb-3 block text-slate-600"></i><p>اضغط "توليد الاختبار" لإنشاء أسئلة تفاعلية ذكية بناءً على محتوى المحاضرة.</p></div>';
+        return;
+    }
+    try {
+        const questions = typeof l.quiz === 'string' ? JSON.parse(l.quiz) : l.quiz;
+        if (!Array.isArray(questions) || !questions.length) {
+            el.innerHTML = '<p class="text-slate-500 text-center py-8">لا توجد أسئلة متوفرة حالياً.</p>';
+            return;
+        }
+        let html = '';
+        questions.forEach((q, idx) => {
+            const opts = Array.isArray(q.options) ? q.options : [];
+            const safeQ = escapeHtml(q.question);
+            const safeExpl = escapeHtml(q.explanation || '');
+            html += `
+            <div class="quiz-card" id="quiz-card-${idx}">
+                <div class="font-bold text-white mb-2 text-base flex items-start gap-2">
+                    <span class="bg-pink-600/30 text-pink-400 w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold mt-0.5">${idx + 1}</span>
+                    <span class="flex-1">${safeQ}</span>
+                </div>
+                <div class="space-y-2 mt-3" id="quiz-q-${idx}">
+                    ${opts.map((opt, optIdx) => `
+                        <button type="button" onclick="handleQuizAnswer(${idx}, ${optIdx})" class="quiz-opt" id="quiz-opt-${idx}-${optIdx}">
+                            ${escapeHtml(opt)}
+                        </button>
+                    `).join('')}
+                </div>
+                <div id="quiz-expl-${idx}" class="text-xs text-slate-300 mt-3 p-3 bg-dark-900 rounded-xl border border-dark-700 hidden leading-relaxed">
+                    <strong class="text-pink-400 block mb-1 font-bold"><i class="fas fa-lightbulb ml-1"></i> التوضيح:</strong>
+                    <span>${safeExpl}</span>
+                </div>
+            </div>`;
+        });
+        el.innerHTML = html;
+    } catch(e) {
+        console.warn('Failed to render quiz:', e);
+        el.innerHTML = '<p class="text-red-400 text-center py-6">تعذر عرض الاختبار، حاول إعادة توليده.</p>';
+    }
+}
+
+function handleQuizAnswer(qIdx, selectedOptIdx) {
+    const l = lectures.find(x => x.id === currentLectureId);
+    if (!l || !l.quiz) return;
+    try {
+        const questions = typeof l.quiz === 'string' ? JSON.parse(l.quiz) : l.quiz;
+        const q = questions[qIdx];
+        if (!q) return;
+        const container = document.getElementById(`quiz-q-${qIdx}`);
+        if (!container) return;
+        
+        const btns = container.querySelectorAll('.quiz-opt');
+        btns.forEach(b => b.disabled = true);
+        
+        const correctIdx = Number(q.answer);
+        const correctBtn = document.getElementById(`quiz-opt-${qIdx}-${correctIdx}`);
+        if (correctBtn) correctBtn.classList.add('correct');
+        
+        const chosenBtn = document.getElementById(`quiz-opt-${qIdx}-${selectedOptIdx}`);
+        if (selectedOptIdx === correctIdx) {
+            toast('إجابة صحيحة! أحسنت 🎯', 'ok');
+        } else {
+            if (chosenBtn) chosenBtn.classList.add('wrong');
+            toast('إجابة غير صحيحة', 'error');
+        }
+        
+        const explEl = document.getElementById(`quiz-expl-${qIdx}`);
+        if (explEl) explEl.classList.remove('hidden');
+    } catch(e) {
+        console.error('handleQuizAnswer error:', e);
+    }
+}
+
+async function generateQuiz() {
+    const st = document.getElementById('quizStatus');
+    const qList = document.getElementById('quizList');
+    const l = lectures.find(x => x.id === currentLectureId);
+    if (!l) return;
+    if (!l.transcript && !l.summary) return alert('يجب توفر تفريغ أو ملخص للمحاضرة أولاً لتوليد الاختبار.');
+    
+    qList.innerHTML = '<div class="text-center py-12"><i class="fas fa-circle-notch fa-spin text-pink-500 text-3xl mb-3"></i><p class="text-sm text-slate-400 font-bold">جاري تحليل المحاضرة وصياغة الأسئلة الذكية...</p></div>';
+    if (st) st.classList.add('hidden');
+    
+    try {
+        const textContent = (l.summary ? (l.summary + "\\n\\n") : "") + (l.transcript ? l.transcript.slice(0, 8000) : "");
+        const prompt = `أنت أستاذ جامعي وخبير تعليمي. بناءً على محتوى المحاضرة التالي، قم بإنشاء 5 أسئلة اختيار من متعدد (MCQs) دقيقة وذكية لاختبار فهم واستيعاب الطالب.
+القواعد:
+1. الأسئلة والخيارات بالعربي مع الحفاظ على المصطلحات بالإنجليزية.
+2. 4 خيارات لكل سؤال.
+3. حدد رقم الإجابة الصحيحة بالـ index من 0 إلى 3 في حقل answer.
+4. اكتب شرحاً مبسطاً ومقنعاً للإجابة الصحيحة في explanation.
+5. أرجع الإجابة كـ JSON صالح ومباشر فقط بدون أي نصوص أخرى:
+[
+  {
+    "question": "نص السؤال؟",
+    "options": ["الخيار 0", "الخيار 1", "الخيار 2", "الخيار 3"],
+    "answer": 0,
+    "explanation": "الشرح هنا"
+  }
+]
+
+محتوى المحاضرة:
+` + textContent;
+
+        const res = await callGemini([{ text: prompt }]);
+        let clean = res.trim();
+        if (clean.startsWith('```json')) clean = clean.slice(7);
+        if (clean.startsWith('```')) clean = clean.slice(3);
+        if (clean.endsWith('```')) clean = clean.slice(0, -3);
+        clean = clean.trim();
+        
+        const parsed = JSON.parse(clean);
+        if (!Array.isArray(parsed) || !parsed.length) throw new Error('بيانات الأسئلة غير مكتملة');
+        
+        l.quiz = JSON.stringify(parsed);
+        renderQuizContent(l);
+        await saveToLocal();
+        uploadSingleLectureToCloud(l);
+        toast('تم توليد الاختبار وحفظه سحابياً! 🎯', 'ok');
+    } catch(e) {
+        console.error('Quiz generation error:', e);
+        if (st) {
+            st.innerText = "خطأ في توليد الاختبار: " + checkQuotaError(e.message);
+            st.classList.remove('hidden');
+        }
+        renderQuizContent(l);
+    }
+}
 
 function dataURLtoBlob(dataurl) {
     try {
@@ -1326,6 +1555,7 @@ function openLectureDetails(id){
     
     document.getElementById('detailTranscript').innerText=l.transcript||'لا يوجد نص.';
     renderSummaryContent(l);
+    renderQuizContent(l);
     document.getElementById('detailNotes').value=l.notes||'';
     document.getElementById('transcriptStatus').classList.add('hidden');
     document.getElementById('summaryStatus').classList.add('hidden');
@@ -1336,7 +1566,25 @@ function openLectureDetails(id){
 function handleImageUpload(ev){const f=ev.target.files[0];if(f){const r=new FileReader();r.onload=e=>{currentImages.push(e.target.result);renderImagesGrid();};r.readAsDataURL(f);}}
 function renderImagesGrid(){const g=document.getElementById('imagesGrid');g.innerHTML='';currentImages.forEach((s,i)=>{const d=document.createElement('div');d.className="relative rounded-xl overflow-hidden border border-dark-600 aspect-video bg-dark-900";d.innerHTML=`<img src="${s}" class="w-full h-full object-cover"><button onclick="removeImage(${i})" class="absolute top-2 right-2 bg-dark-900/80 text-white w-7 h-7 rounded-full flex items-center justify-center border border-dark-600"><i class="fas fa-times text-xs"></i></button>`;g.appendChild(d);});}
 function removeImage(i){currentImages.splice(i,1);renderImagesGrid();}
-async function saveLectureData(){const idx=lectures.findIndex(l=>l.id===currentLectureId);if(idx>-1){lectures[idx].notes=document.getElementById('detailNotes').value;lectures[idx].images=currentImages;await saveToLocal();toast('تم حفظ الملاحظات','ok');}}
+async function saveLectureData(silent = false){
+    const idx=lectures.findIndex(l=>l.id===currentLectureId);
+    if(idx>-1){
+        lectures[idx].notes=document.getElementById('detailNotes').value;
+        lectures[idx].images=currentImages;
+        await saveToLocal();
+        uploadSingleLectureToCloud(lectures[idx]);
+        if (!silent) toast('تم حفظ الملاحظات ومزامنتها','ok');
+    }
+}
+
+let _notesDebounce = null;
+function debounceSaveNotes() {
+    if (_notesDebounce) clearTimeout(_notesDebounce);
+    _notesDebounce = setTimeout(() => {
+        saveLectureData(true);
+    }, 700);
+}
+
 async function deleteLecture(id){
     if(confirm('حذف المحاضرة نهائياً؟')){
         lectures=lectures.filter(l=>l.id!==id);
@@ -1369,25 +1617,20 @@ function getFirestoreDB() {
 function setSyncStatus(status, text) {
     const dot = document.getElementById('syncStatusDot');
     const label = document.getElementById('syncStatusText');
-    const icon = document.getElementById('syncStatusIcon');
-    if (!dot || !label) return;
+    if (!dot) return;
     
     if (status === 'syncing') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
-        label.innerText = text || 'جاري المزامنة...';
-        if (icon) icon.className = 'fas fa-sync-alt text-amber-400 text-xs fa-spin';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.8)]';
+        if (label) label.innerText = 'مزامنة...';
     } else if (status === 'synced') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
-        label.innerText = text || 'متزامن مع السحابة';
-        if (icon) icon.className = 'fas fa-check text-emerald-400 text-xs';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]';
+        if (label) label.innerText = 'سحابي';
     } else if (status === 'error') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
-        label.innerText = text || 'خطأ في المزامنة';
-        if (icon) icon.className = 'fas fa-exclamation-triangle text-rose-400 text-xs';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]';
+        if (label) label.innerText = 'تنبيه';
     } else {
         dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
-        label.innerText = text || 'مزامنة سحابية';
-        if (icon) icon.className = 'fas fa-cloud text-slate-400 text-xs';
+        if (label) label.innerText = 'محلي';
     }
 }
 
@@ -1410,16 +1653,21 @@ async function uploadSingleLectureToCloud(l) {
     try {
         const db = getFirestoreDB();
         const docRef = window.doc(db, 'users', currentUser, 'lectures', String(l.id));
+        const safeDate = (l.date && l.date !== '' && !String(l.date).includes('Invalid')) 
+            ? l.date 
+            : (l.id ? new Date(Number(l.id)).toISOString() : new Date().toISOString());
+        const safeTitle = (l.title && l.title.trim()) ? l.title : ('محاضرة ' + formatLectureDate({ date: safeDate, id: l.id }));
+        
         await window.setDoc(docRef, {
-            id: l.id,
-            title: l.title || '',
-            date: l.date || '',
-            duration: l.duration || 0,
+            id: Number(l.id) || Date.now(),
+            title: safeTitle,
+            date: safeDate,
+            duration: Number(l.duration) || 0,
             transcript: (l.transcript || '').substring(0, 900000),
             summary: (l.summary || '').substring(0, 900000),
             notes: (l.notes || '').substring(0, 200000),
             quiz: l.quiz || '',
-            chatHistory: (l.chatHistory || []).slice(-30),
+            chatHistory: Array.isArray(l.chatHistory) ? l.chatHistory.slice(-30) : [],
             folderId: l.folderId || null,
             hasAudio: !!(l.audioData && l.audioData.length > 50),
             updatedAt: Date.now()
@@ -1462,38 +1710,48 @@ async function syncToCloud() {
             for (const l of lectures) {
                 await uploadSingleLectureToCloud(l);
             }
-            setSyncStatus('synced', 'متزامن مع السحابة');
+            setSyncStatus('synced');
         } catch(e) {
             handleCloudSyncError(e);
         }
-    }, 1200);
+    }, 600);
 }
 
 function initRealtimeCloudSync() {
     if (!currentUser || !window.getFirestore) {
-        setSyncStatus('idle', 'مزامنة محلية');
+        setSyncStatus('idle');
         return;
     }
     
     try {
         const db = getFirestoreDB();
-        setSyncStatus('syncing', 'جاري الاتصال بالسحابة...');
+        setSyncStatus('syncing');
         
-        // 1. Realtime Listen to Folders
+        // 1. Realtime Folders Listener
         window.onSnapshot(window.doc(db, 'users', currentUser, 'meta', 'workspace'), (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
-                if (data.folders && Array.isArray(data.folders)) {
-                    folders = data.folders;
+                if (data && Array.isArray(data.folders)) {
+                    const cloudFolderIds = new Set(data.folders.map(f => String(f.id)));
+                    const merged = [...data.folders];
+                    let localHasNew = false;
+                    folders.forEach(lf => {
+                        if (!cloudFolderIds.has(String(lf.id))) {
+                            merged.push(lf);
+                            localHasNew = true;
+                        }
+                    });
+                    folders = merged;
                     getUserDB().setItem('folders', folders);
                     renderLibrary();
+                    if (localHasNew) syncFoldersToCloud();
                 }
-            } else {
+            } else if (folders && folders.length > 0) {
                 syncFoldersToCloud();
             }
         }, (err) => handleCloudSyncError(err));
         
-        // 2. Realtime Listen to Lectures Collection
+        // 2. Realtime Lectures Listener
         if (_cloudUnsubscribe) { _cloudUnsubscribe(); _cloudUnsubscribe = null; }
         
         _cloudUnsubscribe = window.onSnapshot(window.collection(db, 'users', currentUser, 'lectures'), async (snapshot) => {
@@ -1509,17 +1767,22 @@ function initRealtimeCloudSync() {
             // Merge Cloud -> Local
             for (const [idStr, cl] of cloudMap.entries()) {
                 const local = lectures.find(l => String(l.id) === idStr);
+                const safeDate = (cl.date && cl.date !== '' && !String(cl.date).includes('Invalid')) 
+                    ? cl.date 
+                    : (cl.id ? new Date(Number(cl.id)).toISOString() : new Date().toISOString());
+                const safeTitle = (cl.title && cl.title.trim()) ? cl.title : ('محاضرة ' + formatLectureDate({ date: safeDate, id: cl.id }));
+                
                 if (!local) {
                     lectures.push({
-                        id: cl.id,
-                        title: cl.title || '',
-                        date: cl.date || '',
-                        duration: cl.duration || 0,
+                        id: Number(cl.id) || Date.now(),
+                        title: safeTitle,
+                        date: safeDate,
+                        duration: Number(cl.duration) || 0,
                         transcript: cl.transcript || '',
                         summary: cl.summary || '',
                         notes: cl.notes || '',
                         quiz: cl.quiz || '',
-                        chatHistory: cl.chatHistory || [],
+                        chatHistory: Array.isArray(cl.chatHistory) ? cl.chatHistory : [],
                         folderId: cl.folderId || null,
                         audioData: '',
                         images: []
@@ -1527,14 +1790,36 @@ function initRealtimeCloudSync() {
                     changed = true;
                 } else {
                     if (cl.title && local.title !== cl.title) { local.title = cl.title; changed = true; }
+                    if (safeDate && (!local.date || String(local.date).includes('Invalid'))) { local.date = safeDate; changed = true; }
                     if (cl.transcript && local.transcript !== cl.transcript) { local.transcript = cl.transcript; changed = true; }
                     if (cl.summary && local.summary !== cl.summary) { local.summary = cl.summary; changed = true; }
-                    if (cl.notes && local.notes !== cl.notes) { local.notes = cl.notes; changed = true; }
+                    if (cl.notes !== undefined && local.notes !== cl.notes) { local.notes = cl.notes; changed = true; }
                     if (cl.quiz && local.quiz !== cl.quiz) { local.quiz = cl.quiz; changed = true; }
                     if (cl.folderId !== undefined && local.folderId !== cl.folderId) { local.folderId = cl.folderId; changed = true; }
-                    if (cl.chatHistory && cl.chatHistory.length > (local.chatHistory||[]).length) {
+                    if (cl.chatHistory && JSON.stringify(local.chatHistory) !== JSON.stringify(cl.chatHistory)) {
                         local.chatHistory = cl.chatHistory;
                         changed = true;
+                    }
+                    
+                    // LIVE DOM UPDATE: If this lecture is currently open on screen, update elements immediately!
+                    if (currentLectureId && String(currentLectureId) === idStr) {
+                        if (cl.title) document.getElementById('detailTitle').innerText = cl.title;
+                        if (cl.notes !== undefined) {
+                            const notesEl = document.getElementById('detailNotes');
+                            if (notesEl && document.activeElement !== notesEl) {
+                                notesEl.value = cl.notes || '';
+                            }
+                        }
+                        if (cl.transcript) document.getElementById('detailTranscript').innerText = cl.transcript || '';
+                        if (cl.summary) renderSummaryContent(local);
+                        if (cl.quiz) renderQuizContent(local);
+                        if (cl.chatHistory && typeof renderChatHistory === 'function') {
+                            chatHistory = cl.chatHistory;
+                            const chatModal = document.getElementById('chatbotFullscreen');
+                            if (chatModal && !chatModal.classList.contains('chat-hidden')) {
+                                renderChatHistory();
+                            }
+                        }
                     }
                 }
             }
@@ -1549,10 +1834,9 @@ function initRealtimeCloudSync() {
             if (changed) {
                 await getUserDB().setItem('lectures', lectures);
                 renderLibrary();
-                toast('☁️ تم استلام تحديثات سحابية جديدة', 'ok');
             }
             
-            setSyncStatus('synced', 'متزامن مع السحابة');
+            setSyncStatus('synced');
         }, (err) => {
             handleCloudSyncError(err);
         });
@@ -1673,6 +1957,7 @@ ${l.transcript}`;
         l.transcript = t;
         tr.innerText = t;
         await saveToLocal();
+        uploadSingleLectureToCloud(l);
     } catch(e) {
         st.innerText="خطأ: "+checkQuotaError(e.message);
         st.classList.remove('hidden');
@@ -1711,7 +1996,7 @@ ${l.transcript}`;
             }
         });
     }
-    const t=await callGemini(parts);l.summary=t;renderSummaryContent(l);await saveToLocal();}catch(e){st.innerText="خطأ: "+checkQuotaError(e.message);st.classList.remove('hidden');renderSummaryContent(l);}}
+    const t=await callGemini(parts);l.summary=t;renderSummaryContent(l);await saveToLocal();uploadSingleLectureToCloud(l);}catch(e){st.innerText="خطأ: "+checkQuotaError(e.message);st.classList.remove('hidden');renderSummaryContent(l);}}
 </script>
 </body>
 </html>
