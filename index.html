@@ -23,7 +23,7 @@
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
       import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-      import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+      import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
       import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
       window.initializeApp = initializeApp;
       window.getAuth = getAuth;
@@ -35,10 +35,16 @@
       window.doc = doc;
       window.setDoc = setDoc;
       window.getDoc = getDoc;
+      window.collection = collection;
+      window.onSnapshot = onSnapshot;
+      window.deleteDoc = deleteDoc;
+      window.getDocs = getDocs;
       window.getStorage = getStorage;
       window.ref = ref;
       window.uploadString = uploadString;
       window.getDownloadURL = getDownloadURL;
+      window.__firebaseReady = true;
+      window.dispatchEvent(new Event('firebase-ready'));
     </script>
     <script>
         tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Tajawal','sans-serif']},colors:{dark:{900:'#0f172a',800:'#1e293b',700:'#334155'},accent:{500:'#8b5cf6',600:'#7c3aed'}}}}}
@@ -221,6 +227,11 @@
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div><h2 class="text-3xl font-black text-white">مساحة العمل</h2><p class="text-slate-400 mt-1 text-sm">استعرض وحلل محاضراتك</p></div>
         <div class="flex flex-wrap gap-2 items-center w-full md:w-auto">
+            <button id="cloudSyncBtn" onclick="manualSync()" title="اضغط للمزامنة الفورية مع السحابة" class="bg-dark-800 hover:bg-dark-700 text-xs px-3.5 py-2.5 rounded-xl border border-dark-700 font-bold transition flex items-center gap-2">
+                <span id="syncStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span id="syncStatusText" class="text-slate-300">مزامنة سحابية</span>
+                <i class="fas fa-sync-alt text-slate-400 text-xs" id="syncStatusIcon"></i>
+            </button>
             <div class="relative flex-1 md:w-64">
                 <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
                 <input id="librarySearch" type="search" oninput="renderLibrary()" class="w-full p-2.5 pr-9 bg-dark-800 rounded-xl border border-dark-700 text-white text-sm focus:outline-none focus:border-accent-500" placeholder="ابحث في المحاضرات...">
@@ -263,7 +274,24 @@
     <div class="p-6 lg:p-10">
         <button onclick="switchTab('library')" class="mb-6 bg-dark-800 border border-dark-700 rounded-xl px-4 py-2 text-slate-400 hover:text-white transition hover:bg-dark-700 inline-flex items-center gap-2"><i class="fas fa-arrow-right"></i> العودة</button>
         <div class="flex items-center gap-4 mb-8"><h2 id="detailTitle" class="text-3xl font-black text-white cursor-pointer hover:text-accent-400 transition" onclick="editTitle()"></h2><button onclick="editTitle()" class="text-slate-500 hover:text-accent-500 transition text-sm"><i class="fas fa-pen"></i></button></div>
-        <div class="bg-dark-800 rounded-2xl p-5 border border-dark-700 mb-8 flex items-center gap-6 shadow-lg"><div class="w-12 h-12 rounded-full bg-accent-500/20 text-accent-500 flex items-center justify-center text-xl shrink-0"><i class="fas fa-play"></i></div><audio id="detailAudio" controls class="w-full outline-none opacity-80 invert grayscale contrast-200"></audio></div>
+        <!-- Audio Player Container -->
+        <div id="detailAudioContainer" class="bg-dark-800 rounded-2xl p-5 border border-dark-700 mb-8 shadow-lg">
+            <div class="flex flex-col sm:flex-row items-center gap-4">
+                <button id="detailAudioPlayBtn" onclick="toggleDetailAudioPlay()" class="w-14 h-14 rounded-2xl bg-accent-600 hover:bg-accent-500 text-white flex items-center justify-center text-xl shrink-0 transition shadow-lg shadow-accent-600/30">
+                    <i class="fas fa-play" id="detailAudioPlayIcon"></i>
+                </button>
+                <div class="flex-1 w-full">
+                    <div class="flex justify-between text-xs text-slate-400 mb-2 font-mono">
+                        <span id="audioCurrentTime">00:00</span>
+                        <span id="audioTotalTime">00:00</span>
+                    </div>
+                    <audio id="detailAudio" class="w-full h-10 outline-none rounded-xl" controls></audio>
+                </div>
+            </div>
+            <p id="audioNotRecordedNotice" class="text-xs text-slate-500 mt-2 text-center hidden">
+                <i class="fas fa-cloud text-accent-400 ml-1"></i> هذه المحاضرة تمت مزامنتها سحابياً من جهاز آخر (الملخص والتفريغ والملاحظات كاملة هنا، والتسجيل الصوتي محفوظ على الجهاز الأصلي).
+            </p>
+        </div>
         <div class="flex gap-2 mb-6 flex-wrap">
             <button onclick="switchDetailTab('summary')" class="detail-tab-btn bg-accent-600 text-white px-5 py-2 rounded-xl font-bold text-sm transition" data-dtab="summary"><i class="fas fa-project-diagram ml-1"></i> العرض التقديمي</button>
             <button onclick="openChatbot()" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-xl font-bold text-sm transition shadow-lg shadow-green-600/20"><i class="fas fa-robot ml-1"></i> شات بوت</button>
@@ -328,7 +356,49 @@
         <div class="border-t border-dark-700 pt-6 mt-2 text-center">
             <button onclick="forceAppUpdate()" class="text-xs text-slate-500 hover:text-white transition underline"><i class="fas fa-sync-alt mr-1"></i> تحميل آخر تحديث للبرنامج (إصلاح الكاش)</button>
         </div>
-    </div></div>
+    </div>
+
+    <!-- Voice / TTS Settings -->
+    <h2 class="text-3xl font-black mb-8 mt-12 text-white"><i class="fas fa-volume-high text-accent-500 ml-2"></i>صوت وقراءة الشات بوت</h2>
+    <div class="bg-dark-800 rounded-2xl shadow-xl p-8 border border-dark-700 mb-12">
+        <div class="mb-6">
+            <label class="block text-sm font-bold text-slate-400 mb-2">اختر صوت القراءة (الأصوات المتوفرة على جهازك)</label>
+            <select id="ttsVoiceSelect" onchange="saveVoiceSettings()" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500 font-bold appearance-none cursor-pointer">
+                <option value="">-- تلقائي (أفضل صوت عربي متاح) --</option>
+            </select>
+            <p class="text-xs text-slate-500 mt-2">على أجهزة أندرويد و iOS، اختيار صوت Google أو Neural يعطي جودة طبيعية ممتازة.</p>
+        </div>
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <label class="text-sm font-bold text-slate-400">سرعة نطق الصوت</label>
+                <span id="ttsRateValue" class="text-accent-400 font-mono font-bold text-sm">0.88x (موصى به للموبايل)</span>
+            </div>
+            <input type="range" id="ttsRateSlider" min="0.7" max="1.3" step="0.05" value="0.88" oninput="updateTtsRateDisplay()" onchange="saveVoiceSettings()" class="w-full accent-accent-500 cursor-pointer">
+        </div>
+        <div class="flex gap-3">
+            <button onclick="testVoicePlayback()" class="flex-1 bg-accent-600/20 hover:bg-accent-600/30 text-accent-400 border border-accent-500/30 py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2">
+                <i class="fas fa-play"></i> تجربة الصوت الآن
+            </button>
+        </div>
+    </div>
+
+    <!-- Cloud Sync & Reset -->
+    <h2 class="text-3xl font-black mb-8 text-white"><i class="fas fa-cloud text-blue-400 ml-2"></i>المزامنة والبدء من جديد</h2>
+    <div class="bg-dark-800 rounded-2xl shadow-xl p-8 border border-dark-700 mb-12">
+        <p class="text-sm text-slate-300 mb-6 leading-relaxed">
+            بيانات حسابك (المحاضرات، الملخصات، التفريغ، الملاحظات) تتزامن تلقائياً عبر السحابة في الوقت الفعلي بين اللابتوب والموبايل طالما أنك مسجل بنفس الحساب.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <button onclick="manualSync()" class="flex-1 bg-dark-700 hover:bg-dark-600 text-white py-3.5 rounded-xl font-bold transition border border-dark-600 flex items-center justify-center gap-2">
+                <i class="fas fa-sync-alt"></i> مزامنة فورية الآن
+            </button>
+            <button onclick="resetAllDataAndCloud()" class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2">
+                <i class="fas fa-trash-can"></i> مسح البيانات والبدء من جديد
+            </button>
+        </div>
+    </div>
+
+    </div>
 </div>
 
 <script>
@@ -390,18 +460,27 @@ function toast(msg, type=''){
     setTimeout(()=>el.remove(), 3500);
 }
 
-function waitForFirebase(timeoutMs=8000){
-    return new Promise((resolve, reject)=>{
+function waitForFirebase(timeoutMs=10000){
+    return new Promise((resolve)=>{
+        if(window.__firebaseReady && window.getFirestore) return resolve(true);
         const start=Date.now();
-        (function check(){
-            if(window.initializeApp && window.getAuth) return resolve();
-            if(Date.now()-start>timeoutMs) return reject(new Error('Firebase SDK لم يُحمّل. تحقق من الاتصال بالإنترنت.'));
-            setTimeout(check, 40);
-        })();
+        const iv=setInterval(()=>{
+            if(window.__firebaseReady && window.getFirestore){
+                clearInterval(iv);
+                resolve(true);
+            } else if(Date.now()-start>timeoutMs){
+                clearInterval(iv);
+                resolve(false);
+            }
+        }, 50);
     });
 }
 
 function pickRecorderMime(){
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+    }
     const types=['audio/webm;codecs=opus','audio/webm','audio/mp4'];
     for(const t of types){
         if(window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
@@ -439,7 +518,7 @@ const FIREBASE_CONFIG = {
 
 async function handleGoogleLogin(){
     try {
-        await waitForFirebase();
+        await waitForFirebase(8000);
         if (!firebaseApp) {
             firebaseApp = window.initializeApp(FIREBASE_CONFIG);
         }
@@ -452,11 +531,12 @@ async function handleGoogleLogin(){
         localStorage.setItem('neurolect_username', user.displayName || user.email || 'مستخدم');
         currentUser = user.uid;
         toast('تم تسجيل الدخول بنجاح يا ' + (user.displayName || ''), 'ok');
-        enterApp();
+        await enterApp();
     } catch (e) {
         toast('خطأ في تسجيل الدخول: ' + e.message, 'error');
     }
 }
+
 async function enterApp(){
     document.getElementById('loginScreen').classList.add('hidden');
     const uName = localStorage.getItem('neurolect_username') || currentUser;
@@ -464,17 +544,29 @@ async function enterApp(){
     document.getElementById('settingsAccountName').innerText = uName;
     document.getElementById('settingsAccountId').innerText = "الحساب: " + currentUser;
     
-    const db=getUserDB();const d=await db.getItem('lectures');if(d)lectures=d;const f=await db.getItem('folders');if(f)folders=f;
+    const db=getUserDB();
+    const d=await db.getItem('lectures');if(d)lectures=d;
+    const f=await db.getItem('folders');if(f)folders=f;
     document.getElementById('apiKeyInput').value=localStorage.getItem('gemini_api_key_'+currentUser)||'';
     const sm=localStorage.getItem('gemini_model_'+currentUser);if(sm)document.getElementById('modelSelect').innerHTML=`<option value="${sm}">${sm}</option>`;
-    initSpeechRecognition();currentFolderId=null;
+    initSpeechRecognition();
+    currentFolderId=null;
     
-    // Pull cloud data on login
-    await syncFromCloud();
+    // Setup Voice UI & Cloud
+    setTimeout(populateVoiceList, 300);
+    initRealtimeCloudSync();
     
     switchTab('library');
 }
-(function(){const u=localStorage.getItem('neurolect_lastuser');if(u){currentUser=u;enterApp();}})();
+
+(async function(){
+    const u=localStorage.getItem('neurolect_lastuser');
+    if(u){
+        currentUser=u;
+        await waitForFirebase(5000);
+        await enterApp();
+    }
+})();
 
 // ===== BACKUP =====
 async function exportBackup(){const db=getUserDB();const l=await db.getItem('lectures');const f=await db.getItem('folders');const b=new Blob([JSON.stringify({lectures:l||[],folders:f||[]})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`neurolect_${currentUser}_${Date.now()}.json`;a.click();}
@@ -557,18 +649,98 @@ function stopAllTTS() {
     });
 }
 
+function getPreferredVoiceRate() {
+    const saved = localStorage.getItem('neurolect_tts_rate');
+    if (saved) return parseFloat(saved);
+    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    return isMobile ? 0.88 : 1.05;
+}
+
+function updateTtsRateDisplay() {
+    const slider = document.getElementById('ttsRateSlider');
+    const disp = document.getElementById('ttsRateValue');
+    if (!slider || !disp) return;
+    const val = parseFloat(slider.value).toFixed(2);
+    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    disp.innerText = val + 'x' + (Math.abs(val - 0.88) < 0.03 && isMobile ? ' (موصى به للموبايل)' : '');
+}
+
+function saveVoiceSettings() {
+    const sel = document.getElementById('ttsVoiceSelect');
+    const slider = document.getElementById('ttsRateSlider');
+    if (sel && sel.value !== undefined) {
+        localStorage.setItem('neurolect_tts_voice', sel.value);
+    }
+    if (slider) {
+        localStorage.setItem('neurolect_tts_rate', slider.value);
+    }
+    toast('تم حفظ إعدادات الصوت بنجاح', 'ok');
+}
+
+function populateVoiceList() {
+    const sel = document.getElementById('ttsVoiceSelect');
+    if (!sel || !window.speechSynthesis) return;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const arVoices = voices.filter(v => (v.lang && v.lang.toLowerCase().startsWith('ar')) || /arabic|عربي/i.test(v.name));
+    
+    const savedVoice = localStorage.getItem('neurolect_tts_voice') || '';
+    
+    sel.innerHTML = '<option value="">-- تلقائي (أفضل صوت عربي نقي متاح) --</option>';
+    
+    arVoices.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.innerText = v.name + (v.lang ? ` (${v.lang})` : '');
+        if (v.name === savedVoice) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    
+    const slider = document.getElementById('ttsRateSlider');
+    if (slider) {
+        slider.value = getPreferredVoiceRate();
+        updateTtsRateDisplay();
+    }
+}
+
+function getBestArabicVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    const savedVoiceName = localStorage.getItem('neurolect_tts_voice');
+    if (savedVoiceName) {
+        const found = voices.find(v => v.name === savedVoiceName);
+        if (found) return found;
+    }
+    
+    const arVoices = voices.filter(v => (v.lang && v.lang.toLowerCase().startsWith('ar')) || /arabic|عربي/i.test(v.name));
+    if (arVoices.length === 0) return null;
+    
+    // Pick higher quality voice
+    return arVoices.find(v => /google|natural|neural|online/i.test(v.name)) ||
+           arVoices.find(v => /siri|laila|mariam/i.test(v.name)) ||
+           arVoices.find(v => !/compact/i.test(v.name)) ||
+           arVoices[0];
+}
+
+function testVoicePlayback() {
+    stopAllTTS();
+    const text = "مرحباً بك في نيوروليكت! هذا اختبار لنقاء وسرعة صوت المساعد الذكي.";
+    readAloud(null, text, true);
+}
+
 function readAloud(btn, textToRead, isRetry = false) {
     if (isChatMuted && btn === null) return;
+    if (!window.speechSynthesis) return;
     
     if (window.speechSynthesis.speaking && !isRetry) {
         stopAllTTS();
         if (btn && btn._isPlaying) { btn._isPlaying = false; return; }
-        // Fix for browser cancel race condition
         setTimeout(() => readAloud(btn, textToRead, true), 50);
         return;
     }
     
+    // Clean text thoroughly
     const cleanText = textToRead
+        .replace(/<[^>]*>/g, ' ')
         .replace(/[#*_~`>[\]()\-]/g, ' ') 
         .replace(/[=+<>{}|\\^]/g, ' ')
         .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '')
@@ -585,23 +757,26 @@ function readAloud(btn, textToRead, isRetry = false) {
     
     currentUtterance = new SpeechSynthesisUtterance(cleanText);
     currentUtterance.lang = 'ar-SA';
-    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    currentUtterance.rate = isMobile ? 1.0 : 1.25;
+    currentUtterance.rate = getPreferredVoiceRate();
     currentUtterance.pitch = 1.0;
     
-    const voices = window.speechSynthesis.getVoices();
-    const bestVoice = voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('online')) || 
-                      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('neural')) ||
-                      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('google')) || 
-                      voices.find(v => v.lang.startsWith('ar'));
+    const bestVoice = getBestArabicVoice();
     if(bestVoice) currentUtterance.voice = bestVoice;
     
-    currentUtterance.onend = () => { if (btn) { btn._isPlaying = false; btn.classList.remove('text-accent-400'); btn.querySelector('i').classList.replace('fa-volume-up', 'fa-volume-down'); } };
+    currentUtterance.onend = () => { 
+        if (btn) { btn._isPlaying = false; btn.classList.remove('text-accent-400'); btn.querySelector('i').classList.replace('fa-volume-up', 'fa-volume-down'); } 
+    };
+    currentUtterance.onerror = () => { 
+        if (btn) { btn._isPlaying = false; btn.classList.remove('text-accent-400'); btn.querySelector('i').classList.replace('fa-volume-up', 'fa-volume-down'); } 
+    };
+    
     window.speechSynthesis.speak(currentUtterance);
 }
 
-if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = () => {
+        populateVoiceList();
+    };
 }
 
 let chatMediaRecorder = null;
@@ -899,17 +1074,19 @@ async function toggleRecording(){
         
         try{
             const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}});
-            const recMime=pickRecorderMime();
-            mediaRecorder=recMime?new MediaRecorder(stream,{mimeType:recMime}):new MediaRecorder(stream);
-            mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)audioChunks.push(e.data);};
-            mediaRecorder.onstop=()=>{
-                const blob=new Blob(audioChunks,{type:mediaRecorder.mimeType||'audio/webm'});
-                const r=new FileReader();
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const recMime = isIOS ? (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '') : pickRecorderMime();
+            mediaRecorder = recMime ? new MediaRecorder(stream, {mimeType: recMime}) : new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = e => { if(e.data && e.data.size) audioChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const actualMime = mediaRecorder.mimeType || (isIOS ? 'audio/mp4' : 'audio/webm');
+                const blob = new Blob(audioChunks, { type: actualMime });
+                const r = new FileReader();
                 r.readAsDataURL(blob);
-                r.onloadend=async()=>{
+                r.onloadend = async () => {
                     lectures.push({id:Date.now(),title:name||'محاضرة '+new Date().toLocaleDateString('ar-EG'),date:new Date().toISOString(),audioData:r.result,duration:secondsElapsed,transcript:finalTranscript||'',summary:'',notes:'',images:[],folderId:currentFolderId,chatHistory:[],quiz:''});
                     await saveToLocal();document.getElementById('lectureNameInput').value='';switchTab('library');
-                    toast('تم حفظ المحاضرة','ok');
+                    toast('تم حفظ المحاضرة بنجاح','ok');
                 };
             };
             audioChunks=[];finalTranscript='';
@@ -1045,23 +1222,108 @@ function presKeyHandler(e) {
 // ===== DETAILS =====
 function editTitle(){const l=lectures.find(x=>x.id===currentLectureId);const n=prompt('تعديل اسم المحاضرة:',l.title);if(n&&n.trim()){l.title=n.trim();document.getElementById('detailTitle').innerText=l.title;saveToLocal();}}
 function renderSummaryContent(l){const el=document.getElementById('detailSummary');el.innerHTML=l.summary?marked.parse(l.summary):'<p class="text-slate-500 text-center mt-10">اضغط "بناء العرض" لإنشاء عرض تقديمي.</p>';}
+
+function dataURLtoBlob(dataurl) {
+    try {
+        const arr = dataurl.split(',');
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'audio/webm';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+        return new Blob([u8arr], {type:mime});
+    } catch(e) {
+        return null;
+    }
+}
+
+let _detailAudioBlobUrl = null;
+function toggleDetailAudioPlay() {
+    const audioEl = document.getElementById('detailAudio');
+    if (!audioEl || !audioEl.src) return;
+    if (audioEl.paused) {
+        audioEl.play().catch(err => {
+            console.warn('Audio play error:', err);
+            toast('تعذر تشغيل الصوت، قد يكون التنسيق غير مدعوم على متصفحك.', 'error');
+        });
+    } else {
+        audioEl.pause();
+    }
+}
+
 function openLectureDetails(id){
     currentLectureId=id;
     const l=lectures.find(x=>x.id===id);
     currentImages=l.images||[];
-    chatHistory=l.chatHistory||[]; // LOAD CHAT HISTORY
+    chatHistory=l.chatHistory||[];
     document.getElementById('detailTitle').innerText=l.title;
     
-    // Handle audio - gracefully handle missing audio (e.g., cloud-synced lectures)
+    // Audio Player setup
     const audioEl = document.getElementById('detailAudio');
+    const audioNotice = document.getElementById('audioNotRecordedNotice');
+    const playBtn = document.getElementById('detailAudioPlayBtn');
+    const playIcon = document.getElementById('detailAudioPlayIcon');
+    const curTime = document.getElementById('audioCurrentTime');
+    const totTime = document.getElementById('audioTotalTime');
+    
+    if (_detailAudioBlobUrl) {
+        URL.revokeObjectURL(_detailAudioBlobUrl);
+        _detailAudioBlobUrl = null;
+    }
+    
+    if (playIcon) playIcon.className = 'fas fa-play';
+    if (curTime) curTime.innerText = '00:00';
+    if (totTime) totTime.innerText = l.duration ? formatDuration(l.duration) : '00:00';
+    
     if (l.audioData && l.audioData.length > 50) {
-        audioEl.src = l.audioData;
-        audioEl.parentElement.style.display = '';
-        audioEl.onerror = () => { console.warn('Audio format not supported on this device'); };
+        if (audioNotice) audioNotice.classList.add('hidden');
+        if (playBtn) playBtn.classList.remove('opacity-40', 'pointer-events-none');
+        
+        try {
+            if (l.audioData.startsWith('data:')) {
+                const b = dataURLtoBlob(l.audioData);
+                if (b) {
+                    _detailAudioBlobUrl = URL.createObjectURL(b);
+                    audioEl.src = _detailAudioBlobUrl;
+                } else {
+                    audioEl.src = l.audioData;
+                }
+            } else {
+                audioEl.src = l.audioData;
+            }
+        } catch(e) {
+            audioEl.src = l.audioData;
+        }
+        
+        audioEl.load();
+        audioEl.onloadedmetadata = () => {
+            if (totTime && audioEl.duration && !isNaN(audioEl.duration)) {
+                totTime.innerText = formatDuration(audioEl.duration);
+            }
+        };
+        audioEl.ontimeupdate = () => {
+            if (curTime) curTime.innerText = formatDuration(audioEl.currentTime);
+        };
+        audioEl.onplay = () => { if (playIcon) playIcon.className = 'fas fa-pause'; };
+        audioEl.onpause = () => { if (playIcon) playIcon.className = 'fas fa-play'; };
+        audioEl.onended = () => { if (playIcon) playIcon.className = 'fas fa-play'; };
+        audioEl.onerror = () => {
+            console.warn('Audio playback format error on this device');
+            if (audioNotice) {
+                audioNotice.innerText = '⚠️ تعذر فك تشفير هذا الملف الصوتي على هذا المتصفح.';
+                audioNotice.classList.remove('hidden');
+            }
+        };
     } else {
         audioEl.src = '';
-        audioEl.parentElement.style.display = 'none';
+        if (audioNotice) {
+            audioNotice.innerHTML = '<i class="fas fa-cloud text-accent-400 ml-1"></i> هذه المحاضرة متزامنة سحابياً (الملخص والتفريغ والملاحظات كاملة هنا، والتسجيل الصوتي محفوظ على جهاز التسجيل الأصلي).';
+            audioNotice.classList.remove('hidden');
+        }
+        if (playBtn) playBtn.classList.add('opacity-40', 'pointer-events-none');
     }
+    
     document.getElementById('detailTranscript').innerText=l.transcript||'لا يوجد نص.';
     renderSummaryContent(l);
     document.getElementById('detailNotes').value=l.notes||'';
@@ -1070,24 +1332,32 @@ function openLectureDetails(id){
     renderImagesGrid();
     switchTab('details');switchDetailTab('summary');
 }
+
 function handleImageUpload(ev){const f=ev.target.files[0];if(f){const r=new FileReader();r.onload=e=>{currentImages.push(e.target.result);renderImagesGrid();};r.readAsDataURL(f);}}
 function renderImagesGrid(){const g=document.getElementById('imagesGrid');g.innerHTML='';currentImages.forEach((s,i)=>{const d=document.createElement('div');d.className="relative rounded-xl overflow-hidden border border-dark-600 aspect-video bg-dark-900";d.innerHTML=`<img src="${s}" class="w-full h-full object-cover"><button onclick="removeImage(${i})" class="absolute top-2 right-2 bg-dark-900/80 text-white w-7 h-7 rounded-full flex items-center justify-center border border-dark-600"><i class="fas fa-times text-xs"></i></button>`;g.appendChild(d);});}
 function removeImage(i){currentImages.splice(i,1);renderImagesGrid();}
-async function saveLectureData(){const idx=lectures.findIndex(l=>l.id===currentLectureId);if(idx>-1){lectures[idx].notes=document.getElementById('detailNotes').value;lectures[idx].images=currentImages;await saveToLocal();alert('تم الحفظ!');}}
-async function deleteLecture(id){if(confirm('حذف المحاضرة؟')){lectures=lectures.filter(l=>l.id!==id);await saveToLocal();renderLibrary();}}
+async function saveLectureData(){const idx=lectures.findIndex(l=>l.id===currentLectureId);if(idx>-1){lectures[idx].notes=document.getElementById('detailNotes').value;lectures[idx].images=currentImages;await saveToLocal();toast('تم حفظ الملاحظات','ok');}}
+async function deleteLecture(id){
+    if(confirm('حذف المحاضرة نهائياً؟')){
+        lectures=lectures.filter(l=>l.id!==id);
+        await saveToLocal();
+        renderLibrary();
+        deleteLectureFromCloud(id);
+    }
+}
+
 async function saveToLocal(){
     try{
         const db=getUserDB();
         await db.setItem('lectures',lectures);
         await db.setItem('folders',folders);
     }catch(e){console.error(e);}
-    // Trigger cloud sync in background (non-blocking)
     syncToCloud();
 }
 
-// ===== CLOUD SYNC =====
-let _syncTimeout = null;
-let _isSyncing = false;
+// ===== REALTIME CLOUD SYNC =====
+let _cloudUnsubscribe = null;
+let _syncDebounce = null;
 
 function getFirestoreDB() {
     if (!firebaseApp) {
@@ -1096,137 +1366,242 @@ function getFirestoreDB() {
     return window.getFirestore(firebaseApp);
 }
 
-async function syncToCloud() {
-    // Debounce: wait 2 seconds after last save before syncing
-    if (_syncTimeout) clearTimeout(_syncTimeout);
-    _syncTimeout = setTimeout(async () => {
-        if (_isSyncing || !currentUser) return;
-        _isSyncing = true;
-        try {
-            const db = getFirestoreDB();
-            
-            // Prepare lectures without heavy data (audioData, images)
-            const lightLectures = lectures.map(l => ({
-                id: l.id,
-                title: l.title || '',
-                date: l.date || '',
-                transcript: (l.transcript || '').substring(0, 900000), // Firestore limit safety
-                summary: (l.summary || '').substring(0, 900000),
-                notes: l.notes || '',
-                folderId: l.folderId || null,
-                chatHistory: (l.chatHistory || []).slice(-20), // Keep last 20 messages
-                hasAudio: !!l.audioData,
-                hasImages: (l.images && l.images.length > 0) || false
-            }));
-            
-            // Split into chunks of 5 lectures per document (Firestore 1MB limit)
-            const chunkSize = 5;
-            for (let i = 0; i < lightLectures.length; i += chunkSize) {
-                const chunk = lightLectures.slice(i, i + chunkSize);
-                const chunkId = 'chunk_' + i;
-                await window.setDoc(window.doc(db, 'users', currentUser, 'lectures', chunkId), {
-                    items: JSON.stringify(chunk),
-                    updatedAt: Date.now()
-                });
-            }
-            // Save total count for retrieval
-            await window.setDoc(window.doc(db, 'users', currentUser, 'meta', 'info'), {
-                totalLectures: lightLectures.length,
-                totalChunks: Math.ceil(lightLectures.length / chunkSize),
-                folders: JSON.stringify(folders),
-                updatedAt: Date.now()
-            });
-            console.log('☁️ Cloud sync complete:', lightLectures.length, 'lectures');
-        } catch(e) {
-            console.warn('Cloud sync failed (non-critical):', e.message);
-        }
-        _isSyncing = false;
-    }, 2000);
+function setSyncStatus(status, text) {
+    const dot = document.getElementById('syncStatusDot');
+    const label = document.getElementById('syncStatusText');
+    const icon = document.getElementById('syncStatusIcon');
+    if (!dot || !label) return;
+    
+    if (status === 'syncing') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+        label.innerText = text || 'جاري المزامنة...';
+        if (icon) icon.className = 'fas fa-sync-alt text-amber-400 text-xs fa-spin';
+    } else if (status === 'synced') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+        label.innerText = text || 'متزامن مع السحابة';
+        if (icon) icon.className = 'fas fa-check text-emerald-400 text-xs';
+    } else if (status === 'error') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+        label.innerText = text || 'خطأ في المزامنة';
+        if (icon) icon.className = 'fas fa-exclamation-triangle text-rose-400 text-xs';
+    } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+        label.innerText = text || 'مزامنة سحابية';
+        if (icon) icon.className = 'fas fa-cloud text-slate-400 text-xs';
+    }
 }
 
-async function syncFromCloud() {
-    if (!currentUser) return;
+function handleCloudSyncError(err) {
+    console.warn('Cloud Sync Notice:', err);
+    let msg = 'خطأ مزامنة';
+    if (err && (err.code === 'permission-denied' || (err.message && err.message.includes('permission')))) {
+        msg = 'تأكد من وضع Test Mode في Firestore';
+        toast('⚠️ تنبيه: يرجى تفعيل Firestore Database في وضع Test Mode في Firebase Console للسماح بالحفظ والمزامنة.', 'error');
+    } else if (err && err.code === 'unavailable') {
+        msg = 'أنت غير متصل';
+    } else {
+        msg = 'خطأ سحابي';
+    }
+    setSyncStatus('error', msg);
+}
+
+async function uploadSingleLectureToCloud(l) {
+    if (!currentUser || !window.getFirestore) return;
     try {
         const db = getFirestoreDB();
-        
-        // Get meta info
-        const metaSnap = await window.getDoc(window.doc(db, 'users', currentUser, 'meta', 'info'));
-        if (!metaSnap.exists()) {
-            console.log('☁️ No cloud data found, uploading local data...');
-            syncToCloud();
-            return;
-        }
-        
-        const meta = metaSnap.data();
-        const cloudFolders = JSON.parse(meta.folders || '[]');
-        const totalChunks = meta.totalChunks || 1;
-        
-        // Fetch all lecture chunks
-        let cloudLectures = [];
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkId = 'chunk_' + (i * 5);
-            const chunkSnap = await window.getDoc(window.doc(db, 'users', currentUser, 'lectures', chunkId));
-            if (chunkSnap.exists()) {
-                const items = JSON.parse(chunkSnap.data().items || '[]');
-                cloudLectures.push(...items);
+        const docRef = window.doc(db, 'users', currentUser, 'lectures', String(l.id));
+        await window.setDoc(docRef, {
+            id: l.id,
+            title: l.title || '',
+            date: l.date || '',
+            duration: l.duration || 0,
+            transcript: (l.transcript || '').substring(0, 900000),
+            summary: (l.summary || '').substring(0, 900000),
+            notes: (l.notes || '').substring(0, 200000),
+            quiz: l.quiz || '',
+            chatHistory: (l.chatHistory || []).slice(-30),
+            folderId: l.folderId || null,
+            hasAudio: !!(l.audioData && l.audioData.length > 50),
+            updatedAt: Date.now()
+        }, { merge: true });
+    } catch(e) {
+        handleCloudSyncError(e);
+    }
+}
+
+async function deleteLectureFromCloud(id) {
+    if (!currentUser || !window.getFirestore) return;
+    try {
+        const db = getFirestoreDB();
+        await window.deleteDoc(window.doc(db, 'users', currentUser, 'lectures', String(id)));
+    } catch(e) {
+        console.warn('Delete cloud doc failed:', e);
+    }
+}
+
+async function syncFoldersToCloud() {
+    if (!currentUser || !window.getFirestore) return;
+    try {
+        const db = getFirestoreDB();
+        await window.setDoc(window.doc(db, 'users', currentUser, 'meta', 'workspace'), {
+            folders: folders,
+            updatedAt: Date.now()
+        }, { merge: true });
+    } catch(e) {
+        console.warn('Sync folders failed:', e);
+    }
+}
+
+async function syncToCloud() {
+    if (_syncDebounce) clearTimeout(_syncDebounce);
+    _syncDebounce = setTimeout(async () => {
+        if (!currentUser || !window.getFirestore) return;
+        setSyncStatus('syncing');
+        try {
+            await syncFoldersToCloud();
+            for (const l of lectures) {
+                await uploadSingleLectureToCloud(l);
             }
+            setSyncStatus('synced', 'متزامن مع السحابة');
+        } catch(e) {
+            handleCloudSyncError(e);
         }
+    }, 1200);
+}
+
+function initRealtimeCloudSync() {
+    if (!currentUser || !window.getFirestore) {
+        setSyncStatus('idle', 'مزامنة محلية');
+        return;
+    }
+    
+    try {
+        const db = getFirestoreDB();
+        setSyncStatus('syncing', 'جاري الاتصال بالسحابة...');
         
-        // Merge: add cloud lectures that don't exist locally
-        let added = 0;
-        cloudLectures.forEach(cl => {
-            const exists = lectures.find(l => l.id === cl.id);
-            if (!exists) {
-                // Add cloud lecture locally (without audio/images since they weren't synced)
-                lectures.push({
-                    id: cl.id,
-                    title: cl.title,
-                    date: cl.date,
-                    transcript: cl.transcript || '',
-                    summary: cl.summary || '',
-                    notes: cl.notes || '',
-                    folderId: cl.folderId || null,
-                    chatHistory: cl.chatHistory || [],
-                    audioData: '',
-                    images: []
-                });
-                added++;
+        // 1. Realtime Listen to Folders
+        window.onSnapshot(window.doc(db, 'users', currentUser, 'meta', 'workspace'), (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                if (data.folders && Array.isArray(data.folders)) {
+                    folders = data.folders;
+                    getUserDB().setItem('folders', folders);
+                    renderLibrary();
+                }
             } else {
-                // Update text fields from cloud if local is empty but cloud has data
-                if (!exists.transcript && cl.transcript) exists.transcript = cl.transcript;
-                if (!exists.summary && cl.summary) exists.summary = cl.summary;
-                if (!exists.notes && cl.notes) exists.notes = cl.notes;
-                if ((!exists.chatHistory || exists.chatHistory.length === 0) && cl.chatHistory && cl.chatHistory.length > 0) {
-                    exists.chatHistory = cl.chatHistory;
+                syncFoldersToCloud();
+            }
+        }, (err) => handleCloudSyncError(err));
+        
+        // 2. Realtime Listen to Lectures Collection
+        if (_cloudUnsubscribe) { _cloudUnsubscribe(); _cloudUnsubscribe = null; }
+        
+        _cloudUnsubscribe = window.onSnapshot(window.collection(db, 'users', currentUser, 'lectures'), async (snapshot) => {
+            setSyncStatus('syncing');
+            const cloudMap = new Map();
+            snapshot.forEach(docSnap => {
+                const cl = docSnap.data();
+                cloudMap.set(String(cl.id), cl);
+            });
+            
+            let changed = false;
+            
+            // Merge Cloud -> Local
+            for (const [idStr, cl] of cloudMap.entries()) {
+                const local = lectures.find(l => String(l.id) === idStr);
+                if (!local) {
+                    lectures.push({
+                        id: cl.id,
+                        title: cl.title || '',
+                        date: cl.date || '',
+                        duration: cl.duration || 0,
+                        transcript: cl.transcript || '',
+                        summary: cl.summary || '',
+                        notes: cl.notes || '',
+                        quiz: cl.quiz || '',
+                        chatHistory: cl.chatHistory || [],
+                        folderId: cl.folderId || null,
+                        audioData: '',
+                        images: []
+                    });
+                    changed = true;
+                } else {
+                    if (cl.title && local.title !== cl.title) { local.title = cl.title; changed = true; }
+                    if (cl.transcript && local.transcript !== cl.transcript) { local.transcript = cl.transcript; changed = true; }
+                    if (cl.summary && local.summary !== cl.summary) { local.summary = cl.summary; changed = true; }
+                    if (cl.notes && local.notes !== cl.notes) { local.notes = cl.notes; changed = true; }
+                    if (cl.quiz && local.quiz !== cl.quiz) { local.quiz = cl.quiz; changed = true; }
+                    if (cl.folderId !== undefined && local.folderId !== cl.folderId) { local.folderId = cl.folderId; changed = true; }
+                    if (cl.chatHistory && cl.chatHistory.length > (local.chatHistory||[]).length) {
+                        local.chatHistory = cl.chatHistory;
+                        changed = true;
+                    }
                 }
             }
-        });
-        
-        // Merge folders
-        cloudFolders.forEach(cf => {
-            if (!folders.find(f => f.id === cf.id)) {
-                folders.push(cf);
+            
+            // Check if any local lecture is missing from cloud
+            for (const l of lectures) {
+                if (!cloudMap.has(String(l.id))) {
+                    uploadSingleLectureToCloud(l);
+                }
             }
+            
+            if (changed) {
+                await getUserDB().setItem('lectures', lectures);
+                renderLibrary();
+                toast('☁️ تم استلام تحديثات سحابية جديدة', 'ok');
+            }
+            
+            setSyncStatus('synced', 'متزامن مع السحابة');
+        }, (err) => {
+            handleCloudSyncError(err);
         });
         
-        if (added > 0) {
-            // Save merged data locally
-            const localDB = getUserDB();
-            await localDB.setItem('lectures', lectures);
-            await localDB.setItem('folders', folders);
-            console.log('☁️ Synced', added, 'new lectures from cloud');
-        }
-        
-        // Also upload any local-only lectures to cloud
-        const cloudIds = new Set(cloudLectures.map(c => c.id));
-        const localOnly = lectures.filter(l => !cloudIds.has(l.id));
-        if (localOnly.length > 0) {
-            console.log('☁️ Uploading', localOnly.length, 'local-only lectures to cloud...');
-            syncToCloud();
-        }
-        
+    } catch(err) {
+        handleCloudSyncError(err);
+    }
+}
+
+async function manualSync() {
+    setSyncStatus('syncing', 'جاري المزامنة...');
+    toast('🔄 جاري المزامنة الفورية مع السحابة...', 'info');
+    try {
+        await waitForFirebase(4000);
+        if (!firebaseApp) firebaseApp = window.initializeApp(FIREBASE_CONFIG);
+        await syncToCloud();
+        initRealtimeCloudSync();
+        toast('✅ تم تحديث المزامنة السحابية بنجاح!', 'ok');
+        setSyncStatus('synced', 'متزامن مع السحابة');
     } catch(e) {
-        console.warn('Cloud sync pull failed (non-critical):', e.message);
+        handleCloudSyncError(e);
+        alert('تفاصيل خطأ المزامنة:\n' + e.message + '\n\nيرجى التأكد من إنشاء Firestore Database في وضع Test Mode داخل Firebase Console.');
+    }
+}
+
+async function resetAllDataAndCloud() {
+    if (!confirm('⚠️ تحذير نهائي:\nسيتم مسح جميع المحاضرات والمجلدات تماماً من هذا الجهاز ومن حسابك السحابي للبدء من جديد.\n\nهل أنت متأكد من المسح؟')) return;
+    
+    setSyncStatus('syncing', 'جاري المسح الشامل...');
+    try {
+        if (currentUser && window.getFirestore) {
+            const db = getFirestoreDB();
+            const snap = await window.getDocs(window.collection(db, 'users', currentUser, 'lectures'));
+            const delPromises = [];
+            snap.forEach(d => delPromises.push(window.deleteDoc(d.ref)));
+            await Promise.all(delPromises);
+            await window.setDoc(window.doc(db, 'users', currentUser, 'meta', 'workspace'), { folders: [], updatedAt: Date.now() });
+        }
+        
+        const localDB = getUserDB();
+        await localDB.clear();
+        lectures = [];
+        folders = [];
+        currentLectureId = null;
+        renderLibrary();
+        toast('✨ تم مسح جميع البيانات بنجاح، مساحة عملك الآن فارغة وجاهزة للمزامنة النظيفة!', 'ok');
+        setSyncStatus('synced', 'مساحة نظيفة');
+    } catch(e) {
+        alert('حدث خطأ أثناء المسح: ' + e.message);
     }
 }
 
