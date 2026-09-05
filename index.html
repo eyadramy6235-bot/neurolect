@@ -24,6 +24,7 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
       import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
       import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+      import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
       window.initializeApp = initializeApp;
       window.getAuth = getAuth;
       window.signInWithPopup = signInWithPopup;
@@ -34,6 +35,10 @@
       window.doc = doc;
       window.setDoc = setDoc;
       window.getDoc = getDoc;
+      window.getStorage = getStorage;
+      window.ref = ref;
+      window.uploadString = uploadString;
+      window.getDownloadURL = getDownloadURL;
     </script>
     <script>
         tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Tajawal','sans-serif']},colors:{dark:{900:'#0f172a',800:'#1e293b',700:'#334155'},accent:{500:'#8b5cf6',600:'#7c3aed'}}}}}
@@ -91,6 +96,37 @@
         .pres-dot.active{background:#8b5cf6;transform:scale(1.4);box-shadow:0 0 10px rgba(139,92,246,.5)}
         @keyframes slideIn{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:translateX(0)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
+        
+        /* MOBILE CHAT FIXES */
+        @media (max-width: 768px) {
+            .gemini-avatar{width:28px;height:28px;font-size:12px}
+            .gemini-ai-text{padding:12px 14px;font-size:14px;line-height:1.7;border-radius:4px 14px 14px 14px;max-width:calc(100vw - 80px)}
+            .gemini-user-text{padding:10px 14px;font-size:14px;max-width:75%;border-radius:14px 4px 14px 14px}
+            .gemini-bubble-ai{gap:8px}
+            .gemini-ai-text h2{font-size:0.95rem}
+            .gemini-ai-text ul,.gemini-ai-text ol{padding-right:1rem}
+            .gemini-ai-text li{margin-bottom:0.25rem;font-size:13px}
+            .gemini-ai-text p{margin-bottom:0.4rem;font-size:13px}
+            .gemini-msg-area{padding:0 4px}
+            #chatMessages{padding-bottom:env(safe-area-inset-bottom,0px)}
+            .read-btn{font-size:11px !important;padding:4px 8px !important}
+        }
+        /* Safe area for notch phones */
+        @supports(padding:max(0px)) {
+            #chatbotFullscreen > div:last-child {
+                padding-bottom: max(16px, env(safe-area-inset-bottom));
+            }
+        }
+        #toastWrap{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);z-index:70;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(420px,calc(100% - 24px))}
+        .toast{background:#1e293b;border:1px solid #8b5cf6;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;font-size:14px;box-shadow:0 12px 40px rgba(0,0,0,.4);pointer-events:auto;animation:msgIn .3s}
+        .toast.error{border-color:#ef4444}
+        .toast.ok{border-color:#22c55e}
+        .quiz-card{background:#0f172a;border:1px solid #334155;border-radius:16px;padding:16px 18px;margin-bottom:12px}
+        .quiz-opt{width:100%;text-align:right;padding:10px 12px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-weight:700;margin-top:8px;transition:.15s}
+        .quiz-opt:hover{border-color:#8b5cf6}
+        .quiz-opt.correct{border-color:#22c55e;background:rgba(34,197,94,.12);color:#86efac}
+        .quiz-opt.wrong{border-color:#ef4444;background:rgba(239,68,68,.12);color:#fca5a5}
+        .quiz-opt:disabled{cursor:default;opacity:1}
     </style>
 </head>
 <body class="flex h-screen overflow-hidden selection:bg-accent-500 selection:text-white">
@@ -108,8 +144,8 @@
         <div class="flex items-center gap-3 mb-6">
             <div class="flex-1 h-px bg-dark-700"></div><span class="text-xs text-slate-500 font-bold">أو بالطريقة المحلية</span><div class="flex-1 h-px bg-dark-700"></div>
         </div>
-        <div class="mb-5"><label class="block text-sm font-bold text-slate-400 mb-2">اسم المستخدم</label><input type="text" id="loginUsername" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500 font-bold" placeholder="مثال: eyad123"></div>
-        <div class="mb-6"><label class="block text-sm font-bold text-slate-400 mb-2">كلمة المرور</label><input type="password" id="loginPassword" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500" placeholder="••••••••"></div>
+        <div class="mb-5"><label class="block text-sm font-bold text-slate-400 mb-2">اسم المستخدم</label><input type="text" id="loginUsername" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500 font-bold" placeholder="مثال: eyad123" onkeydown="if(event.key==='Enter')handleLogin()"></div>
+        <div class="mb-6"><label class="block text-sm font-bold text-slate-400 mb-2">كلمة المرور</label><input type="password" id="loginPassword" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleLogin()"></div>
         <button onclick="handleLogin()" class="w-full bg-accent-600 hover:bg-accent-500 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg shadow-accent-600/30 mb-3"><i class="fas fa-sign-in-alt ml-2"></i> دخول</button>
         <button onclick="handleRegister()" class="w-full bg-dark-700 hover:bg-dark-600 text-white py-4 rounded-xl font-bold transition border border-dark-600"><i class="fas fa-user-plus ml-2"></i> حساب جديد</button>
         <p id="loginError" class="text-red-400 text-sm mt-4 text-center font-bold hidden"></p>
@@ -184,7 +220,11 @@
 <div id="view-library" class="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar pb-24 lg:pb-10">
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div><h2 class="text-3xl font-black text-white">مساحة العمل</h2><p class="text-slate-400 mt-1 text-sm">استعرض وحلل محاضراتك</p></div>
-        <div class="flex gap-2 items-center">
+        <div class="flex flex-wrap gap-2 items-center w-full md:w-auto">
+            <div class="relative flex-1 md:w-64">
+                <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                <input id="librarySearch" type="search" oninput="renderLibrary()" class="w-full p-2.5 pr-9 bg-dark-800 rounded-xl border border-dark-700 text-white text-sm focus:outline-none focus:border-accent-500" placeholder="ابحث في المحاضرات...">
+            </div>
             <button onclick="createFolder()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-lg shadow-amber-600/20 flex items-center gap-2"><i class="fas fa-folder-plus"></i> مجلد جديد</button>
         </div>
     </header>
@@ -199,7 +239,14 @@
         <div class="bg-dark-800/80 backdrop-blur-md p-8 rounded-3xl border border-dark-700 shadow-2xl relative overflow-hidden">
             <div class="absolute -top-20 -right-20 w-40 h-40 bg-accent-600 rounded-full blur-3xl opacity-20"></div>
             <h2 class="text-2xl font-bold mb-6 text-white flex items-center gap-3 relative z-10"><i class="fas fa-wave-square text-accent-500"></i> إعداد التقاط الصوت</h2>
-            <div class="mb-8 relative z-10"><label class="block text-sm font-bold text-slate-400 mb-2">اسم المحاضرة</label><input type="text" id="lectureNameInput" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500 font-bold" placeholder="مثال: Anatomy Lec 1"></div>
+            <div class="mb-6 relative z-10"><label class="block text-sm font-bold text-slate-400 mb-2">اسم المحاضرة</label><input type="text" id="lectureNameInput" class="w-full p-4 bg-dark-900 rounded-xl border border-dark-700 text-white focus:outline-none focus:border-accent-500 font-bold" placeholder="مثال: Anatomy Lec 1"></div>
+            <div class="mb-8 relative z-10">
+                <label class="cursor-pointer w-full bg-dark-900 hover:bg-dark-700 border border-dashed border-dark-600 hover:border-accent-500 text-slate-300 py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2">
+                    <i class="fas fa-file-audio text-accent-400"></i> رفع ملف صوت جاهز
+                    <input type="file" accept="audio/*,video/mp4,video/webm" class="hidden" onchange="handleAudioFileUpload(event)">
+                </label>
+                <p class="text-xs text-slate-500 mt-2 text-center">MP3 / WAV / M4A / WebM — مفيد لو عندك تسجيل من المحاضرة</p>
+            </div>
             <div class="text-7xl font-mono font-light text-white mb-10 tracking-widest text-center relative z-10" id="timerDisplay">00:00</div>
             <div class="flex justify-center items-center gap-4 mb-10 relative z-10">
                 <button id="pauseBtn" onclick="togglePause()" class="w-16 h-16 rounded-full bg-dark-700 border-2 border-amber-500 text-amber-400 hover:bg-amber-600 hover:text-white transition-all items-center justify-center text-xl hidden" style="display:none"><i class="fas fa-pause" id="pauseIcon"></i></button>
@@ -222,6 +269,7 @@
             <button onclick="openChatbot()" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-xl font-bold text-sm transition shadow-lg shadow-green-600/20"><i class="fas fa-robot ml-1"></i> شات بوت</button>
             <button onclick="switchDetailTab('transcript')" class="detail-tab-btn bg-dark-800 text-slate-400 hover:text-white px-5 py-2 rounded-xl font-bold text-sm transition border border-dark-700" data-dtab="transcript"><i class="fas fa-language ml-1"></i> التفريغ</button>
             <button onclick="switchDetailTab('notes')" class="detail-tab-btn bg-dark-800 text-slate-400 hover:text-white px-5 py-2 rounded-xl font-bold text-sm transition border border-dark-700" data-dtab="notes"><i class="fas fa-sticky-note ml-1"></i> ملاحظات</button>
+            <button onclick="switchDetailTab('quiz')" class="detail-tab-btn bg-dark-800 text-slate-400 hover:text-white px-5 py-2 rounded-xl font-bold text-sm transition border border-dark-700" data-dtab="quiz"><i class="fas fa-clipboard-question ml-1"></i> أسئلة</button>
         </div>
         <div id="dtab-summary" class="detail-tab-content"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><div class="flex justify-between items-center mb-4 border-b border-dark-700 pb-4"><h3 class="text-xl font-black text-white"><i class="fas fa-project-diagram text-accent-500 ml-2"></i> العرض التقديمي</h3><div class="flex gap-2"><button onclick="openPresentation()" class="text-sm bg-green-600 text-white hover:bg-green-500 px-4 py-2 rounded-xl font-bold transition"><i class="fas fa-tv"></i> عرض</button><button onclick="generateRealSummary()" class="text-sm bg-accent-600 text-white hover:bg-accent-500 px-4 py-2 rounded-xl font-bold transition"><i class="fas fa-magic"></i> بناء العرض</button></div></div><div class="summary-content bg-dark-900 rounded-xl p-6 border border-dark-700 overflow-y-auto max-h-[600px] custom-scrollbar text-base text-slate-300 leading-relaxed" id="detailSummary"></div><div id="summaryStatus" class="text-xs text-red-400 mt-2 font-bold hidden"></div></div></div>
 
@@ -245,8 +293,9 @@
         <div id="presDotsContainer" class="flex gap-2 flex-wrap justify-center"></div>
     </div>
 </div>
-        <div id="dtab-transcript" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold text-white"><i class="fas fa-language text-blue-400 ml-2"></i> التفريغ</h3><button onclick="generatePerfectTranscript()" class="text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded-lg font-bold transition"><i class="fas fa-bolt"></i> تفريغ بـ Gemini</button></div><div class="bg-dark-900 rounded-xl p-4 border border-dark-700 overflow-y-auto max-h-96 custom-scrollbar text-sm text-slate-300 font-mono leading-relaxed whitespace-pre-wrap" id="detailTranscript"></div><div id="transcriptStatus" class="text-xs text-red-400 mt-2 font-bold hidden"></div></div></div>
+        <div id="dtab-transcript" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><div class="flex justify-between items-center mb-4 gap-2 flex-wrap"><h3 class="text-lg font-bold text-white"><i class="fas fa-language text-blue-400 ml-2"></i> التفريغ</h3><div class="flex gap-2"><button onclick="copyTranscript()" class="text-xs bg-dark-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg font-bold transition border border-dark-600"><i class="fas fa-copy"></i> نسخ</button><button onclick="generatePerfectTranscript()" class="text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded-lg font-bold transition"><i class="fas fa-bolt"></i> تفريغ بـ Gemini</button></div></div><div class="bg-dark-900 rounded-xl p-4 border border-dark-700 overflow-y-auto max-h-96 custom-scrollbar text-sm text-slate-300 font-mono leading-relaxed whitespace-pre-wrap" id="detailTranscript"></div><div id="transcriptStatus" class="text-xs text-red-400 mt-2 font-bold hidden"></div></div></div>
         <div id="dtab-notes" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-book-journal-whills text-orange-400 ml-2"></i> ملاحظات وصور</h3><textarea id="detailNotes" rows="8" class="w-full p-4 bg-dark-900 border border-dark-700 rounded-xl focus:outline-none focus:border-orange-500/50 text-slate-300 resize-none font-mono text-sm leading-loose custom-scrollbar mb-4" placeholder="ملاحظاتك..."></textarea><div class="mb-3"><label class="cursor-pointer bg-dark-700 hover:bg-dark-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border border-dark-600 w-fit"><i class="fas fa-camera"></i> أضف صورة<input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)"></label></div><div id="imagesGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2"></div><button onclick="saveLectureData()" class="mt-6 w-full bg-dark-700 hover:bg-dark-600 text-white py-4 rounded-xl font-bold border border-dark-600 transition"><i class="fas fa-save"></i> حفظ</button></div></div>
+        <div id="dtab-quiz" class="detail-tab-content hidden"><div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg"><div class="flex justify-between items-center mb-4 gap-2 flex-wrap"><h3 class="text-xl font-black text-white"><i class="fas fa-clipboard-question text-pink-400 ml-2"></i> أسئلة مراجعة</h3><button onclick="generateQuiz()" class="text-sm bg-pink-600 text-white hover:bg-pink-500 px-4 py-2 rounded-xl font-bold transition"><i class="fas fa-magic"></i> توليد الأسئلة</button></div><div id="quizStatus" class="text-xs text-red-400 mb-3 font-bold hidden"></div><div id="quizList" class="space-y-3"></div></div></div>
     </div>
 </div>
 
@@ -304,6 +353,8 @@ function forceAppUpdate() {
 
 </main>
 
+<div id="toastWrap"></div>
+
 <script>
 // ===== PWA SETUP =====
 const manifestJSON = {
@@ -329,6 +380,44 @@ let movingLectureId=null;
 let usedVoiceForCurrentMessage = false;
 let isChatMuted = false;
 
+function toast(msg, type=''){
+    const wrap=document.getElementById('toastWrap');
+    if(!wrap){alert(msg);return;}
+    const el=document.createElement('div');
+    el.className='toast '+(type||'');
+    el.textContent=msg;
+    wrap.appendChild(el);
+    setTimeout(()=>el.remove(), 3500);
+}
+
+function waitForFirebase(timeoutMs=8000){
+    return new Promise((resolve, reject)=>{
+        const start=Date.now();
+        (function check(){
+            if(window.initializeApp && window.getAuth) return resolve();
+            if(Date.now()-start>timeoutMs) return reject(new Error('Firebase SDK لم يُحمّل. تحقق من الاتصال بالإنترنت.'));
+            setTimeout(check, 40);
+        })();
+    });
+}
+
+function pickRecorderMime(){
+    const types=['audio/webm;codecs=opus','audio/webm','audio/mp4'];
+    for(const t of types){
+        if(window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+    }
+    return '';
+}
+
+function formatDuration(sec){
+    sec=Math.max(0, Math.floor(sec||0));
+    return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+}
+
+window.addEventListener('beforeunload', (e)=>{
+    if(isRecording){ e.preventDefault(); e.returnValue=''; }
+});
+
 const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
 function playSound(t){if(isChatMuted)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);if(t==='send'){o.frequency.setValueAtTime(600,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(900,audioCtx.currentTime+.1);g.gain.setValueAtTime(.15,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.15);o.start();o.stop(audioCtx.currentTime+.15);}else{o.frequency.setValueAtTime(880,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(1200,audioCtx.currentTime+.08);g.gain.setValueAtTime(.12,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.3);o.start();o.stop(audioCtx.currentTime+.3);setTimeout(()=>{const o2=audioCtx.createOscillator(),g2=audioCtx.createGain();o2.connect(g2);g2.connect(audioCtx.destination);o2.frequency.setValueAtTime(1100,audioCtx.currentTime);g2.gain.setValueAtTime(.1,audioCtx.currentTime);g2.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.2);o2.start();o2.stop(audioCtx.currentTime+.2);},150);}}
 
@@ -350,6 +439,7 @@ const FIREBASE_CONFIG = {
 
 async function handleGoogleLogin(){
     try {
+        await waitForFirebase();
         if (!firebaseApp) {
             firebaseApp = window.initializeApp(FIREBASE_CONFIG);
         }
@@ -358,14 +448,13 @@ async function handleGoogleLogin(){
         const result = await window.signInWithPopup(auth, provider);
         const user = result.user;
         
-        // Save user and enter app
         localStorage.setItem('neurolect_lastuser', user.uid);
         localStorage.setItem('neurolect_username', user.displayName || user.email || 'مستخدم');
         currentUser = user.uid;
-        alert('تم تسجيل الدخول بنجاح يا ' + (user.displayName || ''));
+        toast('تم تسجيل الدخول بنجاح يا ' + (user.displayName || ''), 'ok');
         enterApp();
     } catch (e) {
-        alert('خطأ في تسجيل الدخول: ' + e.message);
+        toast('خطأ في تسجيل الدخول: ' + e.message, 'error');
     }
 }
 async function enterApp(){
@@ -378,14 +467,19 @@ async function enterApp(){
     const db=getUserDB();const d=await db.getItem('lectures');if(d)lectures=d;const f=await db.getItem('folders');if(f)folders=f;
     document.getElementById('apiKeyInput').value=localStorage.getItem('gemini_api_key_'+currentUser)||'';
     const sm=localStorage.getItem('gemini_model_'+currentUser);if(sm)document.getElementById('modelSelect').innerHTML=`<option value="${sm}">${sm}</option>`;
-    initSpeechRecognition();currentFolderId=null;switchTab('library');
+    initSpeechRecognition();currentFolderId=null;
+    
+    // Pull cloud data on login
+    await syncFromCloud();
+    
+    switchTab('library');
 }
 (function(){const u=localStorage.getItem('neurolect_lastuser');if(u){currentUser=u;enterApp();}})();
 
 // ===== BACKUP =====
 async function exportBackup(){const db=getUserDB();const l=await db.getItem('lectures');const f=await db.getItem('folders');const b=new Blob([JSON.stringify({lectures:l||[],folders:f||[]})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`neurolect_${currentUser}_${Date.now()}.json`;a.click();}
 function importBackup(){document.getElementById('importFileInput').click();}
-async function processImport(ev){const f=ev.target.files[0];if(!f)return;try{const raw=JSON.parse(await f.text());if(Array.isArray(raw)){lectures=raw;folders=[];}else{lectures=raw.lectures||[];folders=raw.folders||[];}await saveToLocal();currentFolderId=null;renderLibrary();alert('تم الاستيراد!');}catch(e){alert('ملف غير صالح.');}}
+async function processImport(ev){const f=ev.target.files[0];if(!f)return;try{const raw=JSON.parse(await f.text());if(Array.isArray(raw)){lectures=raw;folders=[];}else{lectures=raw.lectures||[];folders=raw.folders||[];}await saveToLocal();currentFolderId=null;renderLibrary();toast('تم الاستيراد!','ok');}catch(e){toast('ملف غير صالح.','error');}}
 
 // ===== FOLDERS =====
 function getFolderPath(folderId){const path=[];let id=folderId;while(id){const f=folders.find(x=>x.id===id);if(!f)break;path.unshift(f);id=f.parentId;}return path;}
@@ -419,10 +513,21 @@ function renderLibrary(){
     const path=getFolderPath(currentFolderId);
     const rootCrumb=document.createElement('button');rootCrumb.className='text-slate-400 hover:text-white transition font-bold flex items-center gap-1';rootCrumb.innerHTML='<i class="fas fa-home"></i> الرئيسية';rootCrumb.onclick=()=>{currentFolderId=null;renderLibrary();};bc.appendChild(rootCrumb);
     path.forEach(f=>{const sep=document.createElement('span');sep.className='text-slate-600';sep.innerHTML='<i class="fas fa-chevron-left text-xs"></i>';bc.appendChild(sep);const btn=document.createElement('button');btn.className='text-slate-400 hover:text-white transition font-bold';btn.innerText=f.name;btn.onclick=()=>{currentFolderId=f.id;renderLibrary();};bc.appendChild(btn);});
+    const q=(document.getElementById('librarySearch')?.value||'').trim().toLowerCase();
     const subFolders=getSubFolders(currentFolderId);const subLectures=getLecturesInFolder(currentFolderId);
-    subFolders.sort((a,b)=>a.name.localeCompare(b.name)).forEach(f=>{const count=getLecturesInFolder(f.id).length+getSubFolders(f.id).length;const card=document.createElement('div');card.className="folder-card bg-dark-800 p-6 rounded-2xl border border-amber-500/30 hover:border-amber-400 cursor-pointer flex flex-col";card.onclick=()=>{currentFolderId=f.id;renderLibrary();};card.innerHTML=`<div class="flex justify-between mb-4"><div class="text-amber-400 bg-amber-500/10 w-12 h-12 rounded-xl flex items-center justify-center text-xl border border-amber-500/20"><i class="fas fa-folder"></i></div><div class="flex gap-1"><button onclick="event.stopPropagation();renameFolder(${f.id})" class="text-slate-600 hover:text-accent-400 transition p-2" title="تعديل الاسم"><i class="fas fa-pen text-xs"></i></button><button onclick="event.stopPropagation();deleteFolder(${f.id})" class="text-slate-600 hover:text-red-500 transition p-2" title="حذف"><i class="fas fa-trash text-xs"></i></button></div></div><h3 class="font-bold text-lg text-white mb-1 truncate">${f.name}</h3><p class="text-xs text-slate-500">${count} عنصر</p>`;grid.appendChild(card);});
-    subLectures.sort((a,b)=>b.id-a.id).forEach(l=>{const card=document.createElement('div');card.className="bg-dark-800 p-6 rounded-2xl border border-dark-700 hover:border-accent-500/50 cursor-pointer flex flex-col transition";card.onclick=()=>openLectureDetails(l.id);card.innerHTML=`<div class="flex justify-between mb-4"><div class="text-accent-400 bg-dark-900 w-10 h-10 rounded-lg flex items-center justify-center border border-dark-700"><i class="fas fa-file-audio"></i></div><div class="flex gap-1"><button onclick="event.stopPropagation();openMoveModal(${l.id})" class="text-slate-600 hover:text-amber-400 transition p-2" title="نقل"><i class="fas fa-folder-open text-xs"></i></button><button onclick="event.stopPropagation();deleteLecture(${l.id})" class="text-slate-600 hover:text-red-500 transition p-2" title="حذف"><i class="fas fa-trash text-xs"></i></button></div></div><h3 class="font-bold text-lg text-white mb-1 truncate">${l.title}</h3><p class="text-xs text-slate-500 font-mono">${new Date(l.date).toLocaleDateString('ar-EG')}</p>`;grid.appendChild(card);});
-    if(!subFolders.length&&!subLectures.length){grid.innerHTML='<div class="col-span-full text-center py-20 text-slate-500"><i class="fas fa-folder-open text-4xl mb-3 block text-slate-600"></i>فارغ</div>';}
+    subFolders.sort((a,b)=>a.name.localeCompare(b.name)).forEach(f=>{
+        if(q && !(f.name||'').toLowerCase().includes(q)) return;
+        const count=getLecturesInFolder(f.id).length+getSubFolders(f.id).length;const card=document.createElement('div');card.className="folder-card bg-dark-800 p-6 rounded-2xl border border-amber-500/30 hover:border-amber-400 cursor-pointer flex flex-col";card.onclick=()=>{currentFolderId=f.id;renderLibrary();};card.innerHTML=`<div class="flex justify-between mb-4"><div class="text-amber-400 bg-amber-500/10 w-12 h-12 rounded-xl flex items-center justify-center text-xl border border-amber-500/20"><i class="fas fa-folder"></i></div><div class="flex gap-1"><button onclick="event.stopPropagation();renameFolder(${f.id})" class="text-slate-600 hover:text-accent-400 transition p-2" title="تعديل الاسم"><i class="fas fa-pen text-xs"></i></button><button onclick="event.stopPropagation();deleteFolder(${f.id})" class="text-slate-600 hover:text-red-500 transition p-2" title="حذف"><i class="fas fa-trash text-xs"></i></button></div></div><h3 class="font-bold text-lg text-white mb-1 truncate">${f.name}</h3><p class="text-xs text-slate-500">${count} عنصر</p>`;grid.appendChild(card);
+    });
+    subLectures.sort((a,b)=>b.id-a.id).forEach(l=>{
+        if(q){
+            const hay=((l.title||'')+' '+(l.transcript||'')+' '+(l.notes||'')+' '+(l.summary||'')).toLowerCase();
+            if(!hay.includes(q)) return;
+        }
+        const dur=l.duration?formatDuration(l.duration):'';
+        const card=document.createElement('div');card.className="bg-dark-800 p-6 rounded-2xl border border-dark-700 hover:border-accent-500/50 cursor-pointer flex flex-col transition";card.onclick=()=>openLectureDetails(l.id);card.innerHTML=`<div class="flex justify-between mb-4"><div class="text-accent-400 bg-dark-900 w-10 h-10 rounded-lg flex items-center justify-center border border-dark-700"><i class="fas fa-file-audio"></i></div><div class="flex gap-1"><button onclick="event.stopPropagation();openMoveModal(${l.id})" class="text-slate-600 hover:text-amber-400 transition p-2" title="نقل"><i class="fas fa-folder-open text-xs"></i></button><button onclick="event.stopPropagation();deleteLecture(${l.id})" class="text-slate-600 hover:text-red-500 transition p-2" title="حذف"><i class="fas fa-trash text-xs"></i></button></div></div><h3 class="font-bold text-lg text-white mb-1 truncate">${l.title}</h3><p class="text-xs text-slate-500 font-mono">${new Date(l.date).toLocaleDateString('ar-EG')}${dur?' · '+dur:''}${l.hasAudio===false&&!l.audioData?' · بدون صوت':''}</p>`;grid.appendChild(card);
+    });
+    if(!grid.children.length){grid.innerHTML='<div class="col-span-full text-center py-20 text-slate-500"><i class="fas fa-folder-open text-4xl mb-3 block text-slate-600"></i>'+(document.getElementById('librarySearch')?.value?'لا توجد نتائج للبحث':'فارغ — سجّل محاضرة أو ارفع ملف صوت')+'</div>';}
 }
 
 // ===== VOICE ASSISTANT (TTS & STT) =====
@@ -480,7 +585,8 @@ function readAloud(btn, textToRead, isRetry = false) {
     
     currentUtterance = new SpeechSynthesisUtterance(cleanText);
     currentUtterance.lang = 'ar-SA';
-    currentUtterance.rate = 1.25;
+    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    currentUtterance.rate = isMobile ? 1.0 : 1.25;
     currentUtterance.pitch = 1.0;
     
     const voices = window.speechSynthesis.getVoices();
@@ -781,7 +887,52 @@ let wakeLock = null;
 async function requestWakeLock(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}}
 function releaseWakeLock(){if(wakeLock){wakeLock.release().then(()=>wakeLock=null);}}
 
-async function toggleRecording(){const btn=document.getElementById('recordBtn'),icon=document.getElementById('recordIcon'),name=document.getElementById('lectureNameInput').value.trim(),pauseBtn=document.getElementById('pauseBtn'),pauseStatus=document.getElementById('pauseStatus');if(!isRecording){try{const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}});mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);mediaRecorder.onstop=()=>{const blob=new Blob(audioChunks,{type:'audio/webm'});const r=new FileReader();r.readAsDataURL(blob);r.onloadend=async()=>{lectures.push({id:Date.now(),title:name||'محاضرة '+new Date().toLocaleDateString('ar-EG'),date:new Date().toISOString(),audioData:r.result,transcript:finalTranscript||'',summary:'',notes:'',images:[],folderId:currentFolderId,chatHistory:[]});await saveToLocal();document.getElementById('lectureNameInput').value='';switchTab('library');};};audioChunks=[];finalTranscript='';mediaRecorder.start();if(recognition)try{recognition.start();}catch(e){}isRecording=true;isPaused=false;requestWakeLock();btn.classList.add('recording-glow','bg-red-600','border-red-500');btn.classList.remove('bg-dark-700','border-accent-500');icon.classList.replace('fa-microphone','fa-stop');pauseBtn.style.display='flex';pauseStatus.style.display='none';secondsElapsed=0;timerInterval=setInterval(()=>{secondsElapsed++;document.getElementById('timerDisplay').innerText=String(Math.floor(secondsElapsed/60)).padStart(2,'0')+':'+String(secondsElapsed%60).padStart(2,'0');},1000);}catch(err){alert('يجب السماح بالميكروفون.');}}else{mediaRecorder.stop();mediaRecorder.stream.getTracks().forEach(t=>t.stop());if(recognition)recognition.stop();isRecording=false;isPaused=false;releaseWakeLock();clearInterval(timerInterval);btn.classList.remove('recording-glow','bg-red-600','border-red-500');btn.classList.add('bg-dark-700','border-accent-500');icon.classList.replace('fa-stop','fa-microphone');pauseBtn.style.display='none';pauseStatus.style.display='none';}}
+async function toggleRecording(){
+    const btn=document.getElementById('recordBtn'),icon=document.getElementById('recordIcon'),name=document.getElementById('lectureNameInput').value.trim(),pauseBtn=document.getElementById('pauseBtn'),pauseStatus=document.getElementById('pauseStatus');
+    
+    if(!isRecording){
+        // Clean up any previous recorder
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            try { mediaRecorder.stop(); mediaRecorder.stream.getTracks().forEach(t=>t.stop()); } catch(e) {}
+        }
+        mediaRecorder = null;
+        
+        try{
+            const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}});
+            const recMime=pickRecorderMime();
+            mediaRecorder=recMime?new MediaRecorder(stream,{mimeType:recMime}):new MediaRecorder(stream);
+            mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)audioChunks.push(e.data);};
+            mediaRecorder.onstop=()=>{
+                const blob=new Blob(audioChunks,{type:mediaRecorder.mimeType||'audio/webm'});
+                const r=new FileReader();
+                r.readAsDataURL(blob);
+                r.onloadend=async()=>{
+                    lectures.push({id:Date.now(),title:name||'محاضرة '+new Date().toLocaleDateString('ar-EG'),date:new Date().toISOString(),audioData:r.result,duration:secondsElapsed,transcript:finalTranscript||'',summary:'',notes:'',images:[],folderId:currentFolderId,chatHistory:[],quiz:''});
+                    await saveToLocal();document.getElementById('lectureNameInput').value='';switchTab('library');
+                    toast('تم حفظ المحاضرة','ok');
+                };
+            };
+            audioChunks=[];finalTranscript='';
+            mediaRecorder.start();
+            if(recognition)try{recognition.start();}catch(e){}
+            isRecording=true;isPaused=false;requestWakeLock();
+            btn.classList.add('recording-glow','bg-red-600','border-red-500');
+            btn.classList.remove('bg-dark-700','border-accent-500');
+            icon.classList.replace('fa-microphone','fa-stop');
+            pauseBtn.style.display='flex';pauseStatus.style.display='none';
+            secondsElapsed=0;
+            timerInterval=setInterval(()=>{secondsElapsed++;document.getElementById('timerDisplay').innerText=formatDuration(secondsElapsed);},1000);
+        }catch(err){alert('يجب السماح بالميكروفون.');}
+    } else {
+        try { mediaRecorder.stop(); mediaRecorder.stream.getTracks().forEach(t=>t.stop()); } catch(e) {}
+        if(recognition) try{recognition.stop();}catch(e){}
+        isRecording=false;isPaused=false;releaseWakeLock();clearInterval(timerInterval);
+        btn.classList.remove('recording-glow','bg-red-600','border-red-500');
+        btn.classList.add('bg-dark-700','border-accent-500');
+        icon.classList.replace('fa-stop','fa-microphone');
+        pauseBtn.style.display='none';pauseStatus.style.display='none';
+    }
+}
 
 function togglePause(){
     const pauseBtn=document.getElementById('pauseBtn'),pauseIcon=document.getElementById('pauseIcon'),pauseStatus=document.getElementById('pauseStatus');
@@ -900,7 +1051,17 @@ function openLectureDetails(id){
     currentImages=l.images||[];
     chatHistory=l.chatHistory||[]; // LOAD CHAT HISTORY
     document.getElementById('detailTitle').innerText=l.title;
-    document.getElementById('detailAudio').src=l.audioData||'';
+    
+    // Handle audio - gracefully handle missing audio (e.g., cloud-synced lectures)
+    const audioEl = document.getElementById('detailAudio');
+    if (l.audioData && l.audioData.length > 50) {
+        audioEl.src = l.audioData;
+        audioEl.parentElement.style.display = '';
+        audioEl.onerror = () => { console.warn('Audio format not supported on this device'); };
+    } else {
+        audioEl.src = '';
+        audioEl.parentElement.style.display = 'none';
+    }
     document.getElementById('detailTranscript').innerText=l.transcript||'لا يوجد نص.';
     renderSummaryContent(l);
     document.getElementById('detailNotes').value=l.notes||'';
@@ -914,7 +1075,160 @@ function renderImagesGrid(){const g=document.getElementById('imagesGrid');g.inne
 function removeImage(i){currentImages.splice(i,1);renderImagesGrid();}
 async function saveLectureData(){const idx=lectures.findIndex(l=>l.id===currentLectureId);if(idx>-1){lectures[idx].notes=document.getElementById('detailNotes').value;lectures[idx].images=currentImages;await saveToLocal();alert('تم الحفظ!');}}
 async function deleteLecture(id){if(confirm('حذف المحاضرة؟')){lectures=lectures.filter(l=>l.id!==id);await saveToLocal();renderLibrary();}}
-async function saveToLocal(){try{const db=getUserDB();await db.setItem('lectures',lectures);await db.setItem('folders',folders);}catch(e){console.error(e);}}
+async function saveToLocal(){
+    try{
+        const db=getUserDB();
+        await db.setItem('lectures',lectures);
+        await db.setItem('folders',folders);
+    }catch(e){console.error(e);}
+    // Trigger cloud sync in background (non-blocking)
+    syncToCloud();
+}
+
+// ===== CLOUD SYNC =====
+let _syncTimeout = null;
+let _isSyncing = false;
+
+function getFirestoreDB() {
+    if (!firebaseApp) {
+        firebaseApp = window.initializeApp(FIREBASE_CONFIG);
+    }
+    return window.getFirestore(firebaseApp);
+}
+
+async function syncToCloud() {
+    // Debounce: wait 2 seconds after last save before syncing
+    if (_syncTimeout) clearTimeout(_syncTimeout);
+    _syncTimeout = setTimeout(async () => {
+        if (_isSyncing || !currentUser) return;
+        _isSyncing = true;
+        try {
+            const db = getFirestoreDB();
+            
+            // Prepare lectures without heavy data (audioData, images)
+            const lightLectures = lectures.map(l => ({
+                id: l.id,
+                title: l.title || '',
+                date: l.date || '',
+                transcript: (l.transcript || '').substring(0, 900000), // Firestore limit safety
+                summary: (l.summary || '').substring(0, 900000),
+                notes: l.notes || '',
+                folderId: l.folderId || null,
+                chatHistory: (l.chatHistory || []).slice(-20), // Keep last 20 messages
+                hasAudio: !!l.audioData,
+                hasImages: (l.images && l.images.length > 0) || false
+            }));
+            
+            // Split into chunks of 5 lectures per document (Firestore 1MB limit)
+            const chunkSize = 5;
+            for (let i = 0; i < lightLectures.length; i += chunkSize) {
+                const chunk = lightLectures.slice(i, i + chunkSize);
+                const chunkId = 'chunk_' + i;
+                await window.setDoc(window.doc(db, 'users', currentUser, 'lectures', chunkId), {
+                    items: JSON.stringify(chunk),
+                    updatedAt: Date.now()
+                });
+            }
+            // Save total count for retrieval
+            await window.setDoc(window.doc(db, 'users', currentUser, 'meta', 'info'), {
+                totalLectures: lightLectures.length,
+                totalChunks: Math.ceil(lightLectures.length / chunkSize),
+                folders: JSON.stringify(folders),
+                updatedAt: Date.now()
+            });
+            console.log('☁️ Cloud sync complete:', lightLectures.length, 'lectures');
+        } catch(e) {
+            console.warn('Cloud sync failed (non-critical):', e.message);
+        }
+        _isSyncing = false;
+    }, 2000);
+}
+
+async function syncFromCloud() {
+    if (!currentUser) return;
+    try {
+        const db = getFirestoreDB();
+        
+        // Get meta info
+        const metaSnap = await window.getDoc(window.doc(db, 'users', currentUser, 'meta', 'info'));
+        if (!metaSnap.exists()) {
+            console.log('☁️ No cloud data found, uploading local data...');
+            syncToCloud();
+            return;
+        }
+        
+        const meta = metaSnap.data();
+        const cloudFolders = JSON.parse(meta.folders || '[]');
+        const totalChunks = meta.totalChunks || 1;
+        
+        // Fetch all lecture chunks
+        let cloudLectures = [];
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkId = 'chunk_' + (i * 5);
+            const chunkSnap = await window.getDoc(window.doc(db, 'users', currentUser, 'lectures', chunkId));
+            if (chunkSnap.exists()) {
+                const items = JSON.parse(chunkSnap.data().items || '[]');
+                cloudLectures.push(...items);
+            }
+        }
+        
+        // Merge: add cloud lectures that don't exist locally
+        let added = 0;
+        cloudLectures.forEach(cl => {
+            const exists = lectures.find(l => l.id === cl.id);
+            if (!exists) {
+                // Add cloud lecture locally (without audio/images since they weren't synced)
+                lectures.push({
+                    id: cl.id,
+                    title: cl.title,
+                    date: cl.date,
+                    transcript: cl.transcript || '',
+                    summary: cl.summary || '',
+                    notes: cl.notes || '',
+                    folderId: cl.folderId || null,
+                    chatHistory: cl.chatHistory || [],
+                    audioData: '',
+                    images: []
+                });
+                added++;
+            } else {
+                // Update text fields from cloud if local is empty but cloud has data
+                if (!exists.transcript && cl.transcript) exists.transcript = cl.transcript;
+                if (!exists.summary && cl.summary) exists.summary = cl.summary;
+                if (!exists.notes && cl.notes) exists.notes = cl.notes;
+                if ((!exists.chatHistory || exists.chatHistory.length === 0) && cl.chatHistory && cl.chatHistory.length > 0) {
+                    exists.chatHistory = cl.chatHistory;
+                }
+            }
+        });
+        
+        // Merge folders
+        cloudFolders.forEach(cf => {
+            if (!folders.find(f => f.id === cf.id)) {
+                folders.push(cf);
+            }
+        });
+        
+        if (added > 0) {
+            // Save merged data locally
+            const localDB = getUserDB();
+            await localDB.setItem('lectures', lectures);
+            await localDB.setItem('folders', folders);
+            console.log('☁️ Synced', added, 'new lectures from cloud');
+        }
+        
+        // Also upload any local-only lectures to cloud
+        const cloudIds = new Set(cloudLectures.map(c => c.id));
+        const localOnly = lectures.filter(l => !cloudIds.has(l.id));
+        if (localOnly.length > 0) {
+            console.log('☁️ Uploading', localOnly.length, 'local-only lectures to cloud...');
+            syncToCloud();
+        }
+        
+    } catch(e) {
+        console.warn('Cloud sync pull failed (non-critical):', e.message);
+    }
+}
 
 // ===== SETTINGS =====
 async function fetchModelsList(){const k=document.getElementById('apiKeyInput').value;if(!k)return alert('أدخل المفتاح');const s=document.getElementById('modelSelect');s.innerHTML='<option>جاري التحميل...</option>';try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${k}`);const d=await r.json();if(!r.ok)throw new Error(d.error?.message||'خطأ');s.innerHTML='';d.models.filter(m=>m.supportedGenerationMethods?.includes("generateContent")).forEach(m=>{const o=document.createElement('option');o.value=m.name;let lb=m.name.replace('models/','');if(lb.includes('flash'))lb+=" ⚡";o.text=lb;s.appendChild(o);});}catch(e){alert('فشل: '+e.message);}}
